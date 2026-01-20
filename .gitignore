@@ -1,0 +1,10 @@
+config.txt
+factory.log
+01_INBOX/
+02_TXT/
+03_DOC/
+04_PUB/
+05_ARH/
+.DS_Store
+bin/__pycache__/
+*.pyc

@@ -1,3 +1,5 @@
+#V3.3
+
 import sys, os, configparser
 from datetime import datetime
 from youtube_transcript_api import YouTubeTranscriptApi

@@ -6,6 +6,9 @@ from datetime import datetime
 from youtube_transcript_api import YouTubeTranscriptApi
 import yt_dlp
 
+VERSION = "v3.20"
+SCRIPT_NAME = os.path.basename(__file__)
+
 def load_config():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     path = os.path.join(base_dir, "config.txt")
@@ -26,16 +29,15 @@ TARGET_DIR = os.path.join(BASE_DIR, "02_TXT")
 log_name = CONF.get('LOG_FILE', 'factory.log').split('#')[0].strip()
 LOG_FILE_PATH = os.path.join(BASE_DIR, log_name)
 
-SCRIPT_NAME = os.path.basename(__file__)
-
 def log(message, level="INFO"):
-    """Единая точка логирования: Терминал + Файл из конфига"""
+    """Единая точка логирования: Терминал + Файл + Версия"""
     now = datetime.now()
     time_t = now.strftime("%H:%M:%S")
     time_f = now.strftime("%Y-%m-%d %H:%M:%S")
     
-    msg_terminal = f"[{time_t}] [{SCRIPT_NAME}] [{level}] {message}"
-    msg_file = f"[{time_f}] [{SCRIPT_NAME}] [{level}] {message}"
+    # Добавляем [VERSION] в строку
+    msg_terminal = f"[{time_t}] [{SCRIPT_NAME} {VERSION}] [{level}] {message}"
+    msg_file = f"[{time_f}] [{SCRIPT_NAME} {VERSION}] [{level}] {message}"
     
     print(msg_terminal)
     
@@ -44,6 +46,7 @@ def log(message, level="INFO"):
             f.write(msg_file + "\n")
     except Exception as e:
         print(f"!!! Ошибка записи в лог: {e}")
+        
 def clean_filename(name):
     return re.sub(r'[^\w\s-]', '', name).strip().replace(' ', '_')
 

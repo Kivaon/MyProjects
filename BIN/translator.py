@@ -1,102 +1,104 @@
-# --- v4.0 Ultimatum---
-import os
-import requests
-import time
-import sys
-import warnings
-from docx import Document
+# --- ПАРАМЕТРЫ ВЕРСИИ ---
+VERSION = "v4.2.prod"
+DATE = "2026-01-23"
+CHUNK_SIZE = 8000  # Увеличили блок для 2.5/3.0 моделей
+
+import os, sys, configparser, re, time, glob, requests
 from datetime import datetime
+from docx import Document
 
-# Отключаем ворчание SSL
-warnings.filterwarnings("ignore")
+# --- ЗАГРУЗКА КОНФИГА ---
+def load_config():
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(base_dir, "config.txt")
+    config = configparser.ConfigParser()
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            config.read_string('[DEFAULT]\n' + f.read())
+        conf = config['DEFAULT']
+        return conf, base_dir
+    except: return {}, base_dir
 
-# --- НАСТРОЙКИ ---
-KEY = "AIzaSyB7KMmVo9E9vtvLwX3TnfEybQ8y6qCsQYA"
-MODEL = "gemini-2.0-flash"
-SOURCE_DIR = os.path.expanduser("~/Documents/AI_Lab/TXT2DOC")
-TARGET_DIR = os.path.expanduser("~/Documents/AI_Lab/DOC2PUB")
-# -----------------
+CONF, BASE_DIR = load_config()
+API_KEY = CONF.get('API_KEY', '').split('#')[0].strip()
+MODEL_NAME = CONF.get('MODEL_GEMINI', 'gemini-2.5-flash').strip()
+IN_DIR = os.path.join(BASE_DIR, "02_TXT")
+OUT_DIR = os.path.join(BASE_DIR, "03_DOC")
+LOG_FILE = os.path.join(BASE_DIR, "factory.log")
 
-def get_now():
-    return datetime.now().strftime("%H:%M:%S")
+def log(message, level="INFO"):
+    t = datetime.now().strftime("%H:%M:%S")
+    msg = f"[{t}] [{VERSION}] [{level}] {message}"
+    print(msg)
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"{datetime.now().isoformat()} {msg}\n")
 
-def translate_chunk(chunk):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={KEY}"
-    payload = {
-        "contents": [{
-            "parts": [{
-                "text": f"Ты профессиональный редактор. Переведи текст лекции на русский язык ПОЛНОСТЬЮ. Цитаты на иврите оставляй как есть и выделяй жирным (**). Не сокращай текст! ТЕКСТ:\n\n{chunk}"
-            }]
-        }]
-    }
+def translate_chunk(chunk, part_num, total, author, include_source):
+    # Используем ветку v1, так как сканер показал там OK
+    url = f"https://generativelanguage.googleapis.com/v1/models/{MODEL_NAME}:generateContent?key={API_KEY}"
     
-    # Пытаемся перевести кусок, пока не получится (цикл упорства)
-    while True:
+    instr = (
+        "Оставь иврит ЖИРНЫМ (**), перевод КУРСИВОМ (*«...»*)." if include_source 
+        else "Переводи источники сразу на русский ЖИРНЫМ (**), иврит удаляй."
+    )
+
+    prompt = (
+        f"Ты — редактор лекций Рава {author}. Переведи часть {part_num}/{total}.\n"
+        f"ПРАВИЛА:\n1. Речь автора: сразу на русский.\n2. Цитаты: {instr}\n"
+        f"ТЕКСТ:\n{chunk}"
+    )
+
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    
+    for attempt in range(3):
         try:
-            r = requests.post(url, json=payload, timeout=60)
+            r = requests.post(url, json=payload, timeout=120)
             if r.status_code == 200:
                 return r.json()['candidates'][0]['content']['parts'][0]['text']
-            elif r.status_code == 429:
-                print(f"\n[{get_now()}] Лимит Google. Сплю 60 сек...")
-                time.sleep(60)
+            if r.status_code == 429:
+                log(f"Лимит 429. Ждем {60*(attempt+1)}с...", "WARN")
+                time.sleep(60*(attempt+1))
             else:
-                print(f"\n[{get_now()}] Ошибка {r.status_code}. Жду 10 сек...")
-                time.sleep(10)
-        except:
-            time.sleep(5)
+                log(f"Ошибка {r.status_code}: {r.text[:100]}", "ERROR")
+        except Exception as e:
+            log(f"Ошибка сети: {e}", "ERROR")
+        time.sleep(5)
+    return "[Ошибка перевода]"
 
 def main():
-    os.makedirs(TARGET_DIR, exist_ok=True)
-    all_files = [f for f in os.listdir(SOURCE_DIR) if f.endswith(".txt")]
-    if not all_files:
-        print("Папка пуста!")
-        return
-    
-    selected_file = max([os.path.join(SOURCE_DIR, f) for f in all_files], key=os.path.getmtime)
-    file_name = os.path.basename(selected_file)
-    
-    print(f"[{get_now()}] >>> СТАРТ ПОЛНОГО ПЕРЕВОДА")
-    print(f"[{get_now()}] >>> Файл: {file_name}")
-    
-    with open(selected_file, "r", encoding="utf-8") as f:
-        text_data = f.read()
+    os.makedirs(OUT_DIR, exist_ok=True)
+    files = glob.glob(os.path.join(IN_DIR, "*.txt"))
+    if not files: log("Нет файлов в 02_TXT", "ERROR"); return
 
-    # Куски по 5000 знаков — идеально для Gemini
-    chunk_size = 5000 
-    chunks = [text_data[i:i+chunk_size] for i in range(0, len(text_data), chunk_size)]
+    # Выбор файла (аргумент или последний)
+    target = max(files, key=os.path.getmtime)
+    if len(sys.argv) > 1 and not sys.argv[1].startswith('-'):
+        matches = [f for f in files if sys.argv[1] in f]
+        if matches: target = max(matches, key=os.path.getmtime)
+
+    file_name = os.path.basename(target)
+    author = file_name.split('-')[1].replace('_', ' ') if '-' in file_name else "Раввин"
     
+    log(f"Старт: {file_name} на модели {MODEL_NAME}")
+    
+    with open(target, 'r', encoding='utf-8') as f:
+        text = f.read()
+
+    chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
     doc = Document()
-    doc.add_heading(f"Перевод: {file_name}", 0)
+    doc.add_heading(f"Лекция: {author}", 0)
 
     for i, chunk in enumerate(chunks, 1):
-        print(f"[{get_now()}] Обработка части {i} из {len(chunks)}...", end="\r")
+        log(f"Часть {i}/{len(chunks)}...")
+        res = translate_chunk(chunk, i, len(chunks), author, '-s' in sys.argv)
         
-        result = translate_chunk(chunk)
-        
-        # Добавляем текст в Word с сохранением абзацев
-        if result:
-            for paragraph in result.split('\n'):
-                if paragraph.strip():
-                    p = doc.add_paragraph()
-                    # Логика для жирного шрифта (**)
-                    import re
-                    parts = re.split(r'(\*\*.*?\*\*)', paragraph)
-                    for part in parts:
-                        if part.startswith('**') and part.endswith('**'):
-                            p.add_run(part.replace('**', '')).bold = True
-                        else:
-                            p.add_run(part)
-            
-            sys.stdout.write("\033[K")
-            print(f"[{get_now()}] ✅ Часть {i} готова.")
-            
-            # Небольшая пауза, чтобы не частить
-            time.sleep(20)
+        # Простое добавление текста в Word
+        p = doc.add_paragraph(res)
+        time.sleep(10) # Безопасная пауза
 
-    out_name = f"FULL_TRANS_{file_name.replace('.txt', '.docx')}"
-    doc.save(os.path.join(TARGET_DIR, out_name))
-    print(f"---")
-    print(f"[{get_now()}] 🎉 ФИНАЛ! Файл сохранен: {out_name}")
+    out_path = os.path.join(OUT_DIR, f"Ready_{file_name.replace('.txt', '.docx')}")
+    doc.save(out_path)
+    log(f"Завершено: {out_path}", "DONE")
 
 if __name__ == "__main__":
     main()

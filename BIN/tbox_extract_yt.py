@@ -99,7 +99,7 @@ def main():
         tbox_log("Запуск процесса ОБЛАГОРАЖИВАНИЯ (Refinery)...", META, "INFO", CONF)
         
         # Передаем путь к файлу в новый рефайнер, который умеет делать паузы
-        refiner.run_refining(raw_path)
+        refiner.run_refining(raw_path, mode="YT")
         
         tbox_log(f"--- ЗАВЕРШЕНО: {base_name} ---", META, "DONE", CONF)
 

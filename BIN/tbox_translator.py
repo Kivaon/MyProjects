@@ -28,6 +28,9 @@ def load_tbox_config():
             if '${BASE_DIR}' in conf[key]:
                 conf[key] = conf[key].replace('${BASE_DIR}', actual_base)
         return conf
+    except Exception as e:
+        print(f"Ошибка в load_tbox_config: {e}")
+        return None
 
 def load_prompts(conf):
     """Загрузка справочника промптов из файла"""

@@ -1,4 +1,4 @@
-import os, sys, time, glob, requests, shutil, re
+import os, sys, time, glob, requests, shutil, re, argparse
 from datetime import datetime
 from docx import Document   
 from docx.shared import Pt, Cm
@@ -28,7 +28,32 @@ def load_tbox_config():
             if '${BASE_DIR}' in conf[key]:
                 conf[key] = conf[key].replace('${BASE_DIR}', actual_base)
         return conf
-    except: return None
+
+def load_prompts(conf):
+    """Загрузка справочника промптов из файла"""
+    prompts_dir = conf.get('PROMPTS_DIR', '06_PROMPTS')
+    script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    prompts_path = os.path.join(script_dir, prompts_dir, 'prompts.md')
+    prompts = {
+        'TORAH': "Ты — редактор лекций Рава {author}. Переведи часть {part_num}/{total_parts} на русский.\nСТРОГО СОХРАНЯЙ РАЗМЕТКУ: '#' для заголовков и '**' для выделений.\nСтиль: возвышенный, точный.\nТЕКСТ:\n{chunk}",
+        'FICTION': "Переведи художественный текст часть {part_num}/{total_parts} на русский.\nСОХРАНЯЙ стилистику и тон оригинала.\nРазметка: '#' для заголовков, '**' для выделений.\nТЕКСТ:\n{chunk}",
+        'GENERIC': "Переведи текст часть {part_num}/{total_parts} на русский.\nТЕКСТ:\n{chunk}"
+    }
+    if os.path.exists(prompts_path):
+        try:
+            with open(prompts_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            # Парсинг по заголовкам # CODE
+            sections = re.split(r'^# (\w+)$', content, flags=re.MULTILINE)
+            for i in range(1, len(sections), 2):
+                code = sections[i].strip()
+                text = sections[i+1].strip()
+                prompts[code] = text
+        except Exception as e:
+            tbox_log(f"Ошибка загрузки промптов: {e}", META, "ERROR", conf)
+    else:
+        tbox_log(f"Файл промптов не найден, используем встроенные: {prompts_path}", META, "WARN", conf)
+    return prompts
 
 def get_api_ver(model_name):
     """Определяет API версию по названию модели"""
@@ -71,16 +96,25 @@ def find_working_model(api_key, conf):
             continue
     return None
 
-def translate_md_chunk(chunk, part_num, total_parts, author, conf):
+def translate_md_chunk(chunk, part_num, total_parts, author, conf, prompts, prompt_code, include_original):
     """Перевод MD-текста с retry-логикой и переключением модели"""
     global CURRENT_MODEL
     api_key = conf.get('API_KEY', '').split('#')[0].strip()
     
-    prompt = (
-        f"Ты — редактор лекций Рава {author}. Переведи часть {part_num}/{total_parts} на русский.\n"
-        f"СТРОГО СОХРАНЯЙ РАЗМЕТКУ: '#' для заголовков и '**' для выделений.\n"
-        f"Стиль: возвышенный, точный. ТЕКСТ:\n{chunk}"
+    # Получить промпт из справочника
+    base_prompt = prompts.get(prompt_code, prompts.get('GENERIC', 'Переведи на русский: {chunk}'))
+    
+    # Подставить плейсхолдеры
+    prompt = base_prompt.format(
+        author=author,
+        part_num=part_num,
+        total_parts=total_parts,
+        chunk=chunk
     )
+    
+    # Если include_original, добавить инструкцию о цитатах
+    if include_original:
+        prompt += "\n\nВКЛЮЧАЙ ОРИГИНАЛЬНЫЙ ТЕКСТ ЦИТАТ В СКОБКАХ ПОСЛЕ ПЕРЕВОДА."
 
     while True:
         # Маркер начала чанка с текущей моделью
@@ -173,37 +207,68 @@ def render_md_to_docx(md_text, doc):
 
 def main():
     global CURRENT_MODEL
+    
+    # Парсинг аргументов
+    parser = argparse.ArgumentParser(description='TBox Translator')
+    parser.add_argument('file', nargs='?', help='Путь к файлу или имя файла')
+    parser.add_argument('-txt', action='store_true', help='Использовать последний txt из TXT_RAW')
+    parser.add_argument('-md', action='store_true', help='Использовать последний md из TXT_DIR')
+    parser.add_argument('-s', action='store_true', help='Включать оригинал цитат')
+    parser.add_argument('-XXX', type=str, help='Код промпта (TORAH, FICTION, GENERIC)')
+    args = parser.parse_args()
+    
     CONF = load_tbox_config()
     if not CONF: 
         print("Ошибка: Конфиг не найден")
         return
     
+    # Загрузка промптов
+    PROMPTS = load_prompts(CONF)
+    
+    # Выбор промпта
+    prompt_code = args.XXX or CONF.get('DEFAULT_PROMPT', 'TORAH')
+    if prompt_code not in PROMPTS:
+        prompt_code = 'GENERIC'
+    tbox_log(f"Выбран промпт: {prompt_code}", META, "INFO", CONF)
+    
     # Инициализация глобальной модели
     CURRENT_MODEL = CONF.get('MODEL_GEMINI', 'gemini-2.0-flash').strip()
     
     # Пути из конфига
-    in_dir = CONF.get('TXT_RAW')           # 02_TXT/RAW
-    out_dir = CONF.get('DOC_TRANSLATED')   # 03_DOC/TRANSLATED
-    arh_dir = CONF.get('ARH_TXT')          # 05_ARH/TXT
+    txt_raw_dir = CONF.get('TXT_RAW')           # 02_TXT/RAW
+    txt_dir = CONF.get('TXT_DIR', '01_TXT')     # Для md файлов
+    out_dir = CONF.get('DOC_TRANSLATED')        # 03_DOC/TRANSLATED
+    arh_dir = CONF.get('ARH_TXT')               # 05_ARH/TXT
 
     # --- ВЫБОР ФАЙЛА ---
     target = None
-    if len(sys.argv) > 1:
-        manual_path = sys.argv[1]
-        if os.path.exists(manual_path):
-            target = manual_path
-        else:
-            potential_path = os.path.join(in_dir, manual_path)
+    if args.file:
+        if os.path.exists(args.file):
+            target = args.file
+        elif args.file.endswith('.txt'):
+            potential_path = os.path.join(txt_raw_dir, args.file)
             if os.path.exists(potential_path):
                 target = potential_path
-
+        elif args.file.endswith('.md'):
+            potential_path = os.path.join(txt_dir, args.file)
+            if os.path.exists(potential_path):
+                target = potential_path
+    
     if not target:
-        # АВТОПИЛОТ: самый свежий файл
-        files = glob.glob(os.path.join(in_dir, "*.txt"))
-        if not files:
-            tbox_log("Нет новых файлов для перевода в 02_TXT.", META, "INFO", CONF)
-            return
-        target = max(files, key=os.path.getmtime)
+        if args.md:
+            # Последний md из TXT_DIR
+            files = glob.glob(os.path.join(txt_dir, "*.md"))
+            if files:
+                target = max(files, key=os.path.getmtime)
+        elif args.txt or not (args.md or args.txt):
+            # Последний txt из TXT_RAW (по умолчанию)
+            files = glob.glob(os.path.join(txt_raw_dir, "*.txt"))
+            if files:
+                target = max(files, key=os.path.getmtime)
+    
+    if not target:
+        tbox_log("Нет подходящих файлов для перевода", META, "INFO", CONF)
+        return
 
     file_name = os.path.basename(target)
     author = file_name.split('-')[1].replace('_', ' ') if '-' in file_name else "Раввин"
@@ -225,14 +290,14 @@ def main():
 
     for i, chunk in enumerate(chunks, 1):
         tbox_log(f"Перевод чанка {i}/{len(chunks)}...", META, "INFO", CONF)
-        translated_md = translate_md_chunk(chunk, i, len(chunks), author, CONF)
+        translated_md = translate_md_chunk(chunk, i, len(chunks), author, CONF, PROMPTS, prompt_code, args.s)
         render_md_to_docx(translated_md, doc)
         if i < len(chunks):
             time.sleep(12)
 
     # Сохранение
     os.makedirs(out_dir, exist_ok=True)
-    res_name = f"Ready_{file_name.replace('.txt', '.docx')}"
+    res_name = f"Ready_{file_name.replace('.txt', '.docx').replace('.md', '.docx')}"
     res_path = os.path.join(out_dir, res_name)
     doc.save(res_path)
     

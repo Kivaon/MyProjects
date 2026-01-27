@@ -1,13 +1,13 @@
 import os, sys, time, glob, requests, shutil, re
 from datetime import datetime
-from docx import Document
+from docx import Document   
 from docx.shared import Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from tbox_utils import tbox_log
 
 # --- MANIFEST ---
-VERSION = "v5.80.clean_docx"
-DATE    = "2026-01-23"
+VERSION = "v6.00.hybrid_pro"
+DATE    = "2026-01-27"
 NAME    = os.path.basename(__file__)
 META    = {"name": NAME, "version": VERSION}
 
@@ -30,23 +30,128 @@ def load_tbox_config():
         return conf
     except: return None
 
-def translate_md_chunk(chunk, author, conf):
-    """Перевод MD-текста с сохранением MD-разметки"""
+def get_api_ver(model_name):
+    """Определяет API версию по названию модели"""
+    v_match = re.search(r'(\d+)', model_name)
+    v_major = int(v_match.group(1)) if v_match else 1
+    if v_major >= 2 or any(x in model_name.lower() for x in ['exp', 'beta']):
+        return "v1beta"
+    return "v1"
+
+def find_working_model(api_key, conf):
+    """Автоматический подбор рабочей модели при сбое основной"""
+    tbox_log("ПОИСК АЛЬТЕРНАТИВНОЙ МОДЕЛИ...", META, "WARN", conf)
+    
+    def v_score(name):
+        v = re.search(r'(\d+\.?\d*)', name)
+        num = float(v.group(1)) if v else 0.0
+        score = num + (0.5 if "flash" in name.lower() else 0)
+        if any(x in name.lower() for x in ["vision", "pro", "exp"]): score -= 1
+        return score
+
+    for api_v in ["v1beta", "v1"]:
+        try:
+            url = f"https://generativelanguage.googleapis.com/{api_v}/models?key={api_key}"
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200:
+                models = [m['name'].split('/')[-1] for m in r.json().get('models', []) 
+                          if 'generateContent' in m.get('supportedGenerationMethods', [])]
+                models.sort(key=v_score, reverse=True)
+                
+                for model in models:
+                    test_url = f"https://generativelanguage.googleapis.com/{api_v}/models/{model}:generateContent?key={api_key}"
+                    try:
+                        tr = requests.post(test_url, json={"contents": [{"parts": [{"text": "test"}]}]}, timeout=5)
+                        if tr.status_code == 200:
+                            tbox_log(f"Найдена модель: {model}", META, "INFO", conf)
+                            return model
+                    except:
+                        continue
+        except:
+            continue
+    return None
+
+def translate_md_chunk(chunk, part_num, total_parts, author, conf):
+    """Перевод MD-текста с retry-логикой и переключением модели"""
+    global CURRENT_MODEL
     api_key = conf.get('API_KEY', '').split('#')[0].strip()
-    model = conf.get('MODEL_GEMINI', 'gemini-2.0-flash')
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     
     prompt = (
-        f"Ты — редактор лекций Рава {author}. Переведи этот текст на русский.\n"
+        f"Ты — редактор лекций Рава {author}. Переведи часть {part_num}/{total_parts} на русский.\n"
         f"СТРОГО СОХРАНЯЙ РАЗМЕТКУ: '#' для заголовков и '**' для выделений.\n"
         f"Стиль: возвышенный, точный. ТЕКСТ:\n{chunk}"
     )
-    
-    try:
-        r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=120)
-        return r.json()['candidates'][0]['content']['parts'][0]['text']
-    except Exception as e:
-        return f"\n[ОШИБКА ПЕРЕВОДА: {e}]\n{chunk}"
+
+    while True:
+        # Маркер начала чанка с текущей моделью
+        header_marker = f"\n\n--- [PART {part_num}/{total_parts} | MODEL: {CURRENT_MODEL}] ---\n"
+        
+        # 3 попытки для текущей модели
+        for attempt in range(3):
+            try:
+                api_ver = get_api_ver(CURRENT_MODEL)
+                url = f"https://generativelanguage.googleapis.com/{api_ver}/models/{CURRENT_MODEL}:generateContent?key={api_key}"
+                
+                tbox_log(f"Попытка {attempt+1}/3: {CURRENT_MODEL}", META, "INFO", conf)
+                
+                r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=120)
+                
+                if r.status_code == 200:
+                    content = r.json()['candidates'][0]['content']['parts'][0]['text']
+                    tbox_log(f"Успех: часть {part_num}/{total_parts}", META, "INFO", conf)
+                    return header_marker + content
+                
+                # Дифференцированная обработка ошибок
+                if r.status_code == 404:
+                    # Модель не существует/удалена — менять сразу
+                    tbox_log(f"Модель {CURRENT_MODEL} не найдена (404)", META, "WARN", conf)
+                    new_model = find_working_model(api_key, conf)
+                    if new_model and new_model != CURRENT_MODEL:
+                        CURRENT_MODEL = new_model
+                        tbox_log(f"Переключились на: {CURRENT_MODEL}", META, "INFO", conf)
+                        break
+                    else:
+                        return f"\n\n[ОШИБКА 404: Модель не найдена]\n[ИСХОДНИК]:\n{chunk[:300]}..."
+                
+                elif r.status_code == 400:
+                    # Bad Request — ошибка в запросе/промпте, не в модели
+                    tbox_log(f"Ошибка 400 Bad Request: проблема с промптом", META, "ERROR", conf)
+                    return f"\n\n[ОШИБКА 400: Bad Request]\n[ИСХОДНИК]:\n{chunk[:300]}..."
+                
+                elif r.status_code in [429, 500, 503]:
+                    # Rate Limit, Server Error, Service Unavailable — повторять
+                    tbox_log(f"Ошибка {r.status_code} на попытке {attempt+1}/3", META, "WARN", conf)
+                    
+                    if attempt == 2:  # На последней попытке ищем замену
+                        new_model = find_working_model(api_key, conf)
+                        if new_model and new_model != CURRENT_MODEL:
+                            CURRENT_MODEL = new_model
+                            tbox_log(f"Переключились на: {CURRENT_MODEL}", META, "INFO", conf)
+                            break
+                        else:
+                            return f"\n\n[ОШИБКА {r.status_code}: Все модели недоступны]\n[ИСХОДНИК]:\n{chunk[:300]}..."
+                
+                else:
+                    # Неизвестная ошибка — обрабатывать как временная
+                    tbox_log(f"API Error {r.status_code} на попытке {attempt+1}/3", META, "WARN", conf)
+                    
+                    if attempt == 2:  # На последней попытке ищем замену
+                        new_model = find_working_model(api_key, conf)
+                        if new_model and new_model != CURRENT_MODEL:
+                            CURRENT_MODEL = new_model
+                            tbox_log(f"Переключились на: {CURRENT_MODEL}", META, "INFO", conf)
+                            break
+                        else:
+                            return f"\n\n[ОШИБКА {r.status_code}: Все модели недоступны]\n[ИСХОДНИК]:\n{chunk[:300]}..."
+                    
+            except Exception as e:
+                tbox_log(f"Сетевая ошибка: {str(e)[:50]}", META, "ERROR", conf)
+            
+            if attempt < 2:
+                time.sleep(15)  # Пауза перед повтором
+        else:
+            # Цикл завершился без break — все 3 попытки провалились и не было смены модели
+            return f"\n\n[КРИТИЧЕСКАЯ ОШИБКА ЧАНКА {part_num}]\n[ИСХОДНИК]:\n{chunk[:300]}..."
 
 def render_md_to_docx(md_text, doc):
     """Отрисовка Markdown в параграфы Word"""
@@ -67,43 +172,63 @@ def render_md_to_docx(md_text, doc):
                 if part.startswith('**'): run.bold = True
 
 def main():
+    global CURRENT_MODEL
     CONF = load_tbox_config()
-    if not CONF: return
+    if not CONF: 
+        print("Ошибка: Конфиг не найден")
+        return
     
-    # Вход и выход
-    in_dir = CONF.get('TXT_DIR')           # 02_TXT
+    # Инициализация глобальной модели
+    CURRENT_MODEL = CONF.get('MODEL_GEMINI', 'gemini-2.0-flash').strip()
+    
+    # Пути из конфига
+    in_dir = CONF.get('TXT_RAW')           # 02_TXT/RAW
     out_dir = CONF.get('DOC_TRANSLATED')   # 03_DOC/TRANSLATED
     arh_dir = CONF.get('ARH_TXT')          # 05_ARH/TXT
-    
-    files = glob.glob(os.path.join(in_dir, "*.txt"))
-    if not files:
-        tbox_log("Нет новых MD-файлов для перевода в 02_TXT.", META, "INFO", CONF)
-        return
 
-    # Берем самый свежий файл
-    target = max(files, key=os.path.getmtime)
+    # --- ВЫБОР ФАЙЛА ---
+    target = None
+    if len(sys.argv) > 1:
+        manual_path = sys.argv[1]
+        if os.path.exists(manual_path):
+            target = manual_path
+        else:
+            potential_path = os.path.join(in_dir, manual_path)
+            if os.path.exists(potential_path):
+                target = potential_path
+
+    if not target:
+        # АВТОПИЛОТ: самый свежий файл
+        files = glob.glob(os.path.join(in_dir, "*.txt"))
+        if not files:
+            tbox_log("Нет новых файлов для перевода в 02_TXT.", META, "INFO", CONF)
+            return
+        target = max(files, key=os.path.getmtime)
+
     file_name = os.path.basename(target)
     author = file_name.split('-')[1].replace('_', ' ') if '-' in file_name else "Раввин"
     
-    tbox_log(f"ПЕРЕВОД: {file_name}", META, "START", CONF)
+    tbox_log(f"СТАРТ ПЕРЕВОДА: {file_name}", META, "START", CONF)
 
     with open(target, 'r', encoding='utf-8') as f:
         full_text = f.read()
 
-    # Делим на куски по 10к символов
+    # Делим на чанки
     chunks = [full_text[i:i+10000] for i in range(0, len(full_text), 10000)]
     
     doc = Document()
-    # Красивые поля
+    # Настройка страницы
     section = doc.sections[0]
-    section.left_margin = Cm(2); section.right_margin = Cm(2)
-    doc.add_heading(f"Перевод: {author}", 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
+    section.left_margin = Cm(2)
+    section.right_margin = Cm(2)
+    doc.add_heading(f"Перевод лекции: {author}", 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     for i, chunk in enumerate(chunks, 1):
-        tbox_log(f"Чанк {i}/{len(chunks)}...", META, "INFO", CONF)
-        translated_md = translate_md_chunk(chunk, author, CONF)
+        tbox_log(f"Перевод чанка {i}/{len(chunks)}...", META, "INFO", CONF)
+        translated_md = translate_md_chunk(chunk, i, len(chunks), author, CONF)
         render_md_to_docx(translated_md, doc)
-        time.sleep(5) # Пауза для лимитов API
+        if i < len(chunks):
+            time.sleep(12)
 
     # Сохранение
     os.makedirs(out_dir, exist_ok=True)
@@ -111,11 +236,13 @@ def main():
     res_path = os.path.join(out_dir, res_name)
     doc.save(res_path)
     
-    # Архивируем MD-исходник
+    # Архивируем
     os.makedirs(arh_dir, exist_ok=True)
-    shutil.move(target, os.path.join(arh_dir, f"TR_DONE_{file_name}"))
-    
-    tbox_log(f"ГОТОВО: {res_name}", META, "DONE", CONF)
+    try:
+        shutil.move(target, os.path.join(arh_dir, f"TR_DONE_{file_name}"))
+        tbox_log(f"ГОТОВО: {res_name}", META, "DONE", CONF)
+    except Exception as e:
+        tbox_log(f"Файл сохранен, архивирование ошибка: {e}", META, "WARNING", CONF)
 
 if __name__ == "__main__":
     main()

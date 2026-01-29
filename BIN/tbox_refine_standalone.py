@@ -168,7 +168,7 @@ def run_refining(raw_path=None, mode="YT"):
     is_rtl = bool(re.search(r'[\u0590-\u05FF]', refined_full[:3000]))
     
     # Markdown
-    md_path = os.path.join(CONF.get('TXT_DIR'), f"{base_name}.md")
+    md_path = os.path.join(CONF.get('MD_DIR', '02_TXT/MD'), f"{base_name}.md")
     with open(md_path, 'w', encoding='utf-8') as f:
         if is_rtl:
             f.write(f'<div dir="rtl">\n\n# {display_title}\n\n{refined_full}\n\n</div>')

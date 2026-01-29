@@ -215,9 +215,9 @@ def main():
     parser = argparse.ArgumentParser(description='TBox Translator')
     parser.add_argument('file', nargs='?', help='Путь к файлу или имя файла')
     parser.add_argument('-txt', action='store_true', help='Использовать последний txt из TXT_RAW')
-    parser.add_argument('-md', action='store_true', help='Использовать последний md из TXT_DIR')
+    parser.add_argument('-md', action='store_true', help='Использовать последний md из MD_DIR')
     parser.add_argument('-s', action='store_true', help='Включать оригинал цитат')
-    parser.add_argument('-XXX', type=str, help='Код промпта (TORAH, FICTION, GENERIC)')
+    parser.add_argument('-p', '--prompt', type=str, help='Код промпта (TORAH, FICTION, GENERIC)', dest='prompt')
     args = parser.parse_args()
     
     CONF = load_tbox_config()
@@ -229,7 +229,7 @@ def main():
     PROMPTS = load_prompts(CONF)
     
     # Выбор промпта
-    prompt_code = args.XXX or CONF.get('DEFAULT_PROMPT', 'TORAH')
+    prompt_code = args.prompt or CONF.get('DEFAULT_PROMPT', 'TORAH')
     if prompt_code not in PROMPTS:
         prompt_code = 'GENERIC'
     tbox_log(f"Выбран промпт: {prompt_code}", META, "INFO", CONF)
@@ -238,8 +238,8 @@ def main():
     CURRENT_MODEL = CONF.get('MODEL_GEMINI', 'gemini-2.0-flash').strip()
     
     # Пути из конфига
-    txt_raw_dir = CONF.get('TXT_RAW')           # 02_TXT/RAW
-    txt_dir = CONF.get('TXT_DIR', '01_TXT')     # Для md файлов
+    txt_raw_dir = CONF.get('TXT_RAW')           # 02_TXT/raw
+    md_dir = CONF.get('MD_DIR', '02_TXT/MD')    # Для md файлов
     out_dir = CONF.get('DOC_TRANSLATED')        # 03_DOC/TRANSLATED
     arh_dir = CONF.get('ARH_TXT')               # 05_ARH/TXT
 
@@ -253,14 +253,14 @@ def main():
             if os.path.exists(potential_path):
                 target = potential_path
         elif args.file.endswith('.md'):
-            potential_path = os.path.join(txt_dir, args.file)
+            potential_path = os.path.join(md_dir, args.file)
             if os.path.exists(potential_path):
                 target = potential_path
     
     if not target:
         if args.md:
-            # Последний md из TXT_DIR
-            files = glob.glob(os.path.join(txt_dir, "*.md"))
+            # Последний md из MD_DIR
+            files = glob.glob(os.path.join(md_dir, "*.md"))
             if files:
                 target = max(files, key=os.path.getmtime)
         elif args.txt or not (args.md or args.txt):

@@ -114,7 +114,7 @@ def run_refining(raw_path):
     is_rtl = bool(re.search(r'[\u0590-\u05FF]', refined_full[:3000]))
     
     # Сохраняем Markdown с поддержкой направления
-    md_path = os.path.join(CONF.get('TXT_DIR'), f"{base_name}.md")
+    md_path = os.path.join(CONF.get('MD_DIR', '02_TXT/MD'), f"{base_name}.md")
     with open(md_path, 'w', encoding='utf-8') as f:
         if is_rtl:
             # Обертка для корректной пунктуации в MD

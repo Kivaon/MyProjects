@@ -54,7 +54,7 @@ def load_progress(output_txt):
             return None
     return None
 
-def save_progress(output_txt, last_chunk_idx, total_chunks, duration):
+def save_progress(output_txt, last_chunk_idx, total_chunks, duration, conf=None):
     """Сохранить текущий прогресс на диск."""
     progress_file = get_progress_file(output_txt)
     progress = {
@@ -67,9 +67,9 @@ def save_progress(output_txt, last_chunk_idx, total_chunks, duration):
         with open(progress_file, "w", encoding="utf-8") as f:
             json.dump(progress, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        utils.tbox_log(f"⚠️ Не удалось сохранить прогресс: {e}", META, "WARNING")
+        utils.tbox_log(f"⚠️ Не удалось сохранить прогресс: {e}", META, "WARNING", conf)
 
-def append_chunk_to_file(output_txt, chunk_idx, segment_time, text):
+def append_chunk_to_file(output_txt, chunk_idx, segment_time, text, conf=None):
     """Сохранить отдельный чанк в файл сразу же."""
     chunk_marker = f"\n\n[CHUNK {chunk_idx + 1} | {segment_time}]\n"
     try:
@@ -78,16 +78,16 @@ def append_chunk_to_file(output_txt, chunk_idx, segment_time, text):
             f.write(text.strip())
             f.write("\n")
     except Exception as e:
-        utils.tbox_log(f"❌ Ошибка сохранения чанка {chunk_idx}: {e}", META, "ERROR")
+        utils.tbox_log(f"❌ Ошибка сохранения чанка {chunk_idx}: {e}", META, "ERROR", conf)
         raise
 
-def transcribe_with_retry(model, target_path, beam_size=5):
+def transcribe_with_retry(model, target_path, beam_size=5, conf=None):
     """Транскрибация с обработкой ошибок и повторами."""
     for attempt in range(MAX_RETRIES):
         try:
             utils.tbox_log(
                 f"Попытка транскрибации {attempt + 1}/{MAX_RETRIES}...", 
-                META, "INFO"
+                META, "INFO", conf
             )
             segments, info = model.transcribe(target_path, beam_size=beam_size, vad_filter=True)
             # Преобразуем generator в список для проверки результата
@@ -99,7 +99,7 @@ def transcribe_with_retry(model, target_path, beam_size=5):
         except MemoryError:
             utils.tbox_log(
                 f"💥 Ошибка памяти на попытке {attempt + 1}. Это критично, повтор не поможет.",
-                META, "ERROR"
+                META, "ERROR", conf
             )
             raise
         except Exception as e:
@@ -107,18 +107,18 @@ def transcribe_with_retry(model, target_path, beam_size=5):
                 utils.tbox_log(
                     f"⚠️ Ошибка на попытке {attempt + 1}: {str(e)[:80]}. "
                     f"Ожидание {RETRY_DELAY} сек перед повтором...",
-                    META, "WARNING"
+                    META, "WARNING", conf
                 )
                 time.sleep(RETRY_DELAY)
             else:
                 utils.tbox_log(
                     f"❌ Все {MAX_RETRIES} попытки исчерпаны: {e}",
-                    META, "ERROR"
+                    META, "ERROR", conf
                 )
                 raise
 
 def transcribe_openai_cloud(target_path):
-    """Транскрибация через OpenAI Whisper API (облако)."""
+    """Транскрибация через OpenAI Whisper API (облако) - v1.0+ compatible."""
     if not OPENAI_AVAILABLE:
         raise ImportError("❌ OpenAI не установлена. Установите: pip install openai")
     
@@ -128,18 +128,20 @@ def transcribe_openai_cloud(target_path):
     if not api_key:
         raise ValueError("❌ OPENAI_API_KEY не установлен в config.txt")
     
-    openai.api_key = api_key
     segments_list = []
     
-    utils.tbox_log("📡 Отправка на OpenAI Whisper API...", META, "INFO")
+    utils.tbox_log("📡 Отправка на OpenAI Whisper API...", META, "INFO", CONF)
     
     try:
+        # Новый API (openai>=1.0.0)
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        
         with open(target_path, "rb") as audio_file:
-            transcript = openai.Audio.transcribe(
+            transcript = client.audio.transcriptions.create(
                 model="whisper-1",
                 file=audio_file,
-                language="en",  # OpenAI автоматически определяет иврит и русский
-                temperature=0.2  # Низкая температура для точности
+                response_format="verbose_json"  # Для получения детализации по сегментам
             )
         
         # Конвертируем формат ответа OpenAI в наш формат сегментов
@@ -150,16 +152,16 @@ def transcribe_openai_cloud(target_path):
                 self.text = text
         
         # Если есть детализация по timings
-        if 'segments' in transcript:
-            for seg in transcript['segments']:
+        if hasattr(transcript, 'segments') and transcript.segments:
+            for seg in transcript.segments:
                 segments_list.append(Segment(
-                    seg.get('start', 0),
-                    seg.get('end', 0),
-                    seg.get('text', '')
+                    seg.start,
+                    seg.end,
+                    seg.text
                 ))
         else:
             # Всё как один сегмент
-            segments_list.append(Segment(0, 0, transcript['text']))
+            segments_list.append(Segment(0, 0, transcript.text))
         
         # Информация о языке
         class AudioInfo:
@@ -167,17 +169,20 @@ def transcribe_openai_cloud(target_path):
                 self.language = language
                 self.duration = duration
         
-        info = AudioInfo("detected by OpenAI", 0)
+        language = getattr(transcript, 'language', 'detected by OpenAI')
+        duration = getattr(transcript, 'duration', 0)
+        info = AudioInfo(language, duration)
         
         return segments_list, info
         
     except Exception as e:
-        utils.tbox_log(f"❌ Ошибка OpenAI API: {e}", META, "ERROR")
+        utils.tbox_log(f"❌ Ошибка OpenAI API: {e}", META, "ERROR", CONF)
         raise
 
-def get_provider_mode():
+def get_provider_mode(conf=None):
     """Определить провайдера из аргументов командной строки или конфига."""
-    CONF = utils.load_local_config()
+    if conf is None:
+        conf = utils.load_local_config()
     
     # Аргумент командной строки имеет приоритет: --provider=openai
     for arg in sys.argv[1:]:
@@ -185,15 +190,11 @@ def get_provider_mode():
             return arg.split("=")[1].lower()
     
     # Иначе из конфига
-    provider = CONF.get('TRANSCRIBE_PROVIDER', 'local').lower()
+    provider = conf.get('TRANSCRIBE_PROVIDER', 'local').lower()
     return provider
 
 def extract_audio():
-    # 0. Определяем провайдера
-    provider = get_provider_mode()
-    utils.tbox_log(f"🔧 Режим транскрипции: {provider.upper()}", META, "INFO")
-    
-    # 1. Загрузка конфигурации
+    # 0. Загрузка конфигурации
     user_arg = sys.argv[1] if len(sys.argv) > 1 else None
     # Фильтруем аргументы с флагами (--provider=...)
     if user_arg and user_arg.startswith("--"):
@@ -203,6 +204,10 @@ def extract_audio():
     if not CONF:
         print("Ошибка: config.txt не найден.")
         return
+
+    # 1. Определяем провайдера
+    provider = get_provider_mode(CONF)
+    utils.tbox_log(f"🔧 Режим транскрипции: {provider.upper()}", META, "INFO", CONF)
 
     INBOX_DIR = CONF.get('INBOX_DIR')
     RAW_DIR   = CONF.get('TXT_RAW')
@@ -221,7 +226,7 @@ def extract_audio():
             target_path = max(files, key=os.path.getmtime)
 
     if not target_path:
-        utils.tbox_log("Аудиофайлы в INBOX не найдены.", META, "ERROR")
+        utils.tbox_log("Аудиофайлы в INBOX не найдены.", META, "ERROR", CONF)
         return
 
     # 3. Подготовка файла вывода и проверка прогресса
@@ -235,7 +240,7 @@ def extract_audio():
         utils.tbox_log(
             f"🔄 ВОССТАНОВЛЕНИЕ: Найден прогресс от {progress['timestamp'][:16]}. "
             f"Обработано {progress['last_chunk_idx'] + 1}/{progress['total_chunks']} чанков.",
-            META, "INFO"
+            META, "INFO", CONF
         )
     else:
         # Новая обработка: создаём заголовок файла
@@ -248,14 +253,14 @@ def extract_audio():
 
     # 4. Инициализация и транскрибация
     start_time = time.perf_counter()
-    utils.tbox_log(f"СТАРТ: {os.path.basename(target_path)}", META, "START")
+    utils.tbox_log(f"СТАРТ: {os.path.basename(target_path)}", META, "START", CONF)
     
     try:
         if provider == "local":
             # Локальная обработка (Faster-Whisper)
-            utils.tbox_log("Загрузка модели AI (Medium, локально)...", META, "INFO")
+            utils.tbox_log("Загрузка модели AI (Medium, локально)...", META, "INFO", CONF)
             model = WhisperModel("medium", device="cpu", compute_type="int8")
-            segments, info = transcribe_with_retry(model, target_path, beam_size=5)
+            segments, info = transcribe_with_retry(model, target_path, beam_size=5, conf=CONF)
         
         elif provider == "openai":
             # OpenAI Whisper API
@@ -269,20 +274,20 @@ def extract_audio():
         utils.tbox_log(
             f"❌ Транскрибация провалилась: {e}. "
             f"Результат сохранён в {output_txt} - переапуск продолжит с того же места.",
-            META, "ERROR"
+            META, "ERROR", CONF
         )
         return
     
     utils.tbox_log(
         f"Аудио: {info.duration/60:.1f} мин. Язык: {info.language}",
-        META, "INFO"
+        META, "INFO", CONF
     )
     
     # 5. Обработка сегментов (чанков) с сохранением каждого
     resume_from = 0
     if progress:
         resume_from = progress['last_chunk_idx'] + 1
-        utils.tbox_log(f"🔄 Возобновление с чанка {resume_from}...", META, "INFO")
+        utils.tbox_log(f"🔄 Возобновление с чанка {resume_from}...", META, "INFO", CONF)
     
     segments_list = list(segments)
     total_chunks = len(segments_list)
@@ -308,16 +313,16 @@ def extract_audio():
         
         # СОХРАНЯЕМ КАЖДЫЙ ЧАНК СРАЗУ В ФАЙЛ
         try:
-            append_chunk_to_file(output_txt, idx, segment_time, segment.text)
+            append_chunk_to_file(output_txt, idx, segment_time, segment.text, CONF)
             # Обновляем прогресс для восстановления
             if hasattr(info, 'duration'):
-                save_progress(output_txt, idx, total_chunks, info.duration)
+                save_progress(output_txt, idx, total_chunks, info.duration, CONF)
             else:
-                save_progress(output_txt, idx, total_chunks, 0)
+                save_progress(output_txt, idx, total_chunks, 0, CONF)
         except Exception as e:
             utils.tbox_log(
                 f"❌ Не удалось сохранить чанк {idx}. Ошибка: {e}",
-                META, "ERROR"
+                META, "ERROR", CONF
             )
             return
     
@@ -331,7 +336,7 @@ def extract_audio():
     utils.tbox_log(
         f"✅ ГОТОВО за {duration_total:.1f} сек. (Скорость: {speed_x:.1f}x). "
         f"Обработано {total_chunks} чанков.",
-        META, "DONE"
+        META, "DONE", CONF
     )
 
     # 6. Завершение файла и очистка прогресса
@@ -348,14 +353,14 @@ def extract_audio():
         if os.path.exists(progress_file):
             os.remove(progress_file)
     except Exception as e:
-        utils.tbox_log(f"⚠️ Ошибка при завершении: {e}", META, "WARNING")
+        utils.tbox_log(f"⚠️ Ошибка при завершении: {e}", META, "WARNING", CONF)
 
     # 7. Авто-передача в Refinery
     if refinery:
-        utils.tbox_log(f"Передаю в Refinery (режим AUDIO)...", META, "INFO")
+        utils.tbox_log(f"Передаю в Refinery (режим AUDIO)...", META, "INFO", CONF)
         refinery.run_refining(output_txt, mode="AUDIO")
     else:
-        utils.tbox_log("Refinery не найден, верстка пропущена.", META, "WARNING")
+        utils.tbox_log("Refinery не найден, верстка пропущена.", META, "WARNING", CONF)
 
 if __name__ == "__main__":
     extract_audio()

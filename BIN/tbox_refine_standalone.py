@@ -127,7 +127,7 @@ def run_refining(raw_path=None, mode="YT"):
         return
 
     # 4. Нарезка и цикл обработки
-    chunks = utils.tbox_chunk_text(content, max_chars=11000)
+    chunks = utils.tbox_chunk_text(content, max_chars=8000)
     refined_full = ""
     
     for i, chunk in enumerate(chunks, 1):
@@ -147,7 +147,7 @@ def run_refining(raw_path=None, mode="YT"):
         url = f"https://generativelanguage.googleapis.com/{m_ver}/models/{m_name}:generateContent?key={api_key}"
 
         try:
-            r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=200)
+            r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=400)
             res = r.json()
             if 'candidates' in res and res['candidates'][0].get('content'):
                 chunk_result = res['candidates'][0]['content']['parts'][0]['text']

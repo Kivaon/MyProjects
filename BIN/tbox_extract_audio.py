@@ -258,8 +258,8 @@ def extract_audio():
     try:
         if provider == "local":
             # Локальная обработка (Faster-Whisper)
-            utils.tbox_log("Загрузка модели AI (Medium, локально)...", META, "INFO", CONF)
-            model = WhisperModel("medium", device="cpu", compute_type="int8")
+            utils.tbox_log("Загрузка модели AI (Small, локально)...", META, "INFO", CONF)
+            model = WhisperModel("small", device="cpu", compute_type="int8")
             segments, info = transcribe_with_retry(model, target_path, beam_size=5, conf=CONF)
         
         elif provider == "openai":

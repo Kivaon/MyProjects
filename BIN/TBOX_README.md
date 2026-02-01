@@ -59,10 +59,10 @@
 ```
 
 **Внешний файл** (опционально):
-- Путь: `06_PROMPTS/prompts.md` (от BASE_DIR)
+- Путь: `07_PROMPTS/prompts.md` (от BASE_DIR)
 - Формат: Markdown с заголовками `# CODE`
 
-Пример `06_PROMPTS/prompts.md`:
+Пример `07_PROMPTS/prompts.md`:
 ```markdown
 # TORAH
 Ты — редактор лекций...
@@ -128,7 +128,7 @@ DOC_TRANSLATED = 03_DOC/TRANSLATED  # Выход .docx
 ARH_TXT = 05_ARH/TXT  # Архив исходников
 
 BASE_DIR = /path/to/workspace  # Базовая директория
-PROMPTS_DIR = 06_PROMPTS  # Где ищут промпты
+PROMPTS_DIR = 07_PROMPTS  # Где ищут промпты
 DEFAULT_PROMPT = TORAH  # Промпт по умолчанию
 ```
 

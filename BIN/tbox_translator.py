@@ -34,7 +34,7 @@ def load_tbox_config():
 
 def load_prompts(conf):
     """Загрузка справочника промптов из файла"""
-    prompts_dir = conf.get('PROMPTS_DIR', '06_PROMPTS')
+    prompts_dir = conf.get('PROMPTS_DIR', '07_PROMPTS')
     script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     prompts_path = os.path.join(script_dir, prompts_dir, 'prompts.md')
     prompts = {

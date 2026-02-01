@@ -71,7 +71,23 @@ def save_progress(output_txt, last_chunk_idx, total_chunks, duration, conf=None)
 
 def append_chunk_to_file(output_txt, chunk_idx, segment_time, text, conf=None):
     """Сохранить отдельный чанк в файл сразу же."""
-    chunk_marker = f"\n\n[CHUNK {chunk_idx + 1} | {segment_time}]\n"
+    # Вычисляем длительность сегмента в секундах
+    try:
+        start_parts = segment_time.split(' → ')[0].split(':')
+        end_parts = segment_time.split(' → ')[1].split(':')
+        
+        start_seconds = int(start_parts[0]) * 60 + int(start_parts[1])
+        end_seconds = int(end_parts[0]) * 60 + int(end_parts[1])
+        segment_duration = end_seconds - start_seconds
+    except:
+        segment_duration = 0
+    
+    # Если сегмент короткий (меньше 60 секунд), не добавляем временную метку
+    if segment_duration < 60:
+        chunk_marker = f"\n\n"
+    else:
+        chunk_marker = f"\n\n[CHUNK {chunk_idx + 1} | {segment_time}]\n"
+    
     try:
         with open(output_txt, "a", encoding="utf-8") as f:
             f.write(chunk_marker)
@@ -89,7 +105,15 @@ def transcribe_with_retry(model, target_path, beam_size=5, conf=None):
                 f"Попытка транскрибации {attempt + 1}/{MAX_RETRIES}...", 
                 META, "INFO", conf
             )
-            segments, info = model.transcribe(target_path, beam_size=beam_size, vad_filter=True)
+            segments, info = model.transcribe(
+                target_path, 
+                beam_size=1,  # Уменьшено с 5 до 1 для ускорения
+                vad_filter=True,
+                max_initial_timestamp=1.0,
+                length_penalty=1.0,
+                condition_on_previous_text=False,
+                temperature=0.0
+            )
             # Преобразуем generator в список для проверки результата
             segments_list = list(segments)
             if segments_list:

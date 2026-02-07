@@ -16,7 +16,8 @@ META = {"name": NAME, "version": VERSION, "date": DATE}
 
 # --- КОНСТАНТЫ ---
 SEGMENT_SIZE = 600  # Размер сегмента для "стены текста"
-MIN_MATCH_RATIO = 0.3  # Минимальное сходство для якорей
+MIN_MATCH_RATIO = 0.15  # Уменьшил с 0.3 до 0.15 для реальных файлов
+PARTIAL_MATCH_LENGTH = 50  # Минимальная длина для частичного совпадения
 
 class TextSegment:
     """Класс для представления текстового сегмента"""
@@ -114,98 +115,334 @@ class SynchroMaster:
             result.append(TextSegment(text, i, is_header))
         return result
     
+    def calculate_text_similarity(self, text1, text2):
+        """Улучшенное сравнение текстов с частичными совпадениями"""
+        if not text1 or not text2:
+            return 0.0
+        
+        # Очистка для сравнения
+        clean1 = re.sub(r'\s+', ' ', text1.lower().strip())
+        clean2 = re.sub(r'\s+', ' ', text2.lower().strip())
+        
+        # Полное совпадение
+        full_ratio = SequenceMatcher(None, clean1, clean2).ratio()
+        
+        # Если полное совпадение хорошее - возвращаем его
+        if full_ratio >= 0.6:
+            return full_ratio
+        
+        # Ищем частичные совпадения
+        # Разбиваем на слова и ищем общие последовательности
+        words1 = clean1.split()
+        words2 = clean2.split()
+        
+        if len(words1) < 3 or len(words2) < 3:
+            return full_ratio  # Слишком короткие для частичного анализа
+        
+        # Ищем самую длинную общую подпоследовательность слов
+        matcher = SequenceMatcher(None, words1, words2)
+        match = matcher.find_longest_match(0, len(words1), 0, len(words2))
+        
+        if match.size >= 3:  # Хотя бы 3 слова подряд
+            # Длина совпадения относительно меньшего текста
+            partial_ratio = match.size / min(len(words1), len(words2))
+            
+            # Учитываем и полное, и частичное совпадение
+            combined_ratio = max(full_ratio, partial_ratio * 0.8)  # Частичное с весом 0.8
+            
+            # Добавляем бонус за длинное совпадение
+            if match.size >= 5:
+                combined_ratio += 0.1
+            if match.size >= 8:
+                combined_ratio += 0.1
+                
+            return min(combined_ratio, 1.0)
+        
+        return full_ratio
+    
     def find_anchors(self):
-        """Нахожу якоря для выравнивания"""
+        """Нахожу якоря для выравнивания - от производного к основному"""
         self.log("Поиск якорей для выравнивания...")
         
-        # Сначала выравниваем заголовки
+        # Определяем кто производный (меньший файл)
         left_headers = [s for s in self.left_segments if s.is_header]
         right_headers = [s for s in self.right_segments if s.is_header]
         
-        for left_header in left_headers:
+        # Выбираем производный файл (меньшее количество заголовков)
+        if len(left_headers) <= len(right_headers):
+            primary_headers, secondary_headers = left_headers, right_headers
+            primary_is_left = True
+        else:
+            primary_headers, secondary_headers = right_headers, left_headers
+            primary_is_left = False
+        
+        self.log(f"Производный файл: {'левый' if primary_is_left else 'правый'} ({len(primary_headers)} заголовков)")
+        self.log(f"Основной файл: {'правый' if primary_is_left else 'левый'} ({len(secondary_headers)} заголовков)")
+        
+        # Для каждого заголовка производного ищем лучший матч в основном
+        for primary_header in primary_headers:
             best_match = None
             best_ratio = 0
             
-            for right_header in right_headers:
-                if right_header.aligned_with:
+            for secondary_header in secondary_headers:
+                if secondary_header.aligned_with:
                     continue
                     
-                # Сравниваем без учета регистра и лишних пробелов
-                left_clean = re.sub(r'\s+', ' ', left_header.text.lower())
-                right_clean = re.sub(r'\s+', ' ', right_header.text.lower())
+                # Улучшенное сравнение
+                ratio = self.calculate_text_similarity(primary_header.text, secondary_header.text)
                 
-                ratio = SequenceMatcher(None, left_clean, right_clean).ratio()
                 if ratio > best_ratio and ratio > MIN_MATCH_RATIO:
                     best_ratio = ratio
-                    best_match = right_header
+                    best_match = secondary_header
             
             if best_match:
-                left_header.aligned_with = best_match
-                best_match.aligned_with = left_header
-                self.log(f"Якорь найден: {left_header.text[:30]}... ↔ {best_match.text[:30]}...")
+                primary_header.aligned_with = best_match
+                best_match.aligned_with = primary_header
+                self.log(f"Якорь найден: {primary_header.text[:30]}... ↔ {best_match.text[:30]}... (сходство: {best_ratio:.2f})")
     
     def align_remaining_segments(self):
-        """Выравниваю оставшиеся сегменты"""
+        """Выравниваю оставшиеся сегменты - от производного к основному"""
         self.log("Выравнивание оставшихся сегментов...")
         
-        # Создаем карту выравнивания
-        used_left = set()
-        used_right = set()
+        # Определяем кто производный (меньший файл)
+        if len(self.left_segments) <= len(self.right_segments):
+            primary_segments, secondary_segments = self.left_segments, self.right_segments
+            primary_is_left = True
+        else:
+            primary_segments, secondary_segments = self.right_segments, self.left_segments
+            primary_is_left = False
         
-        # Добавляем уже выравненные заголовки
-        for left_seg in self.left_segments:
-            if left_seg.aligned_with:
-                self.alignment_map.append((left_seg, left_seg.aligned_with))
-                used_left.add(left_seg)
-                used_right.add(left_seg.aligned_with)
+        self.log(f"Производный файл: {'левый' if primary_is_left else 'правый'} ({len(primary_segments)} сегментов)")
+        self.log(f"Основной файл: {'правый' if primary_is_left else 'левый'} ({len(secondary_segments)} сегментов)")
+        
+        # Собираем уже выравненные заголовки
+        aligned_primary = set()
+        aligned_secondary = set()
+        
+        for seg in primary_segments:
+            if seg.aligned_with:
+                aligned_primary.add(seg)
+                aligned_secondary.add(seg.aligned_with)
         
         # Выравниваем остальные сегменты
-        left_unaligned = [s for s in self.left_segments if s not in used_left]
-        right_unaligned = [s for s in self.right_segments if s not in used_right]
+        primary_unaligned = [s for s in primary_segments if s not in aligned_primary]
+        secondary_unaligned = [s for s in secondary_segments if s not in aligned_secondary]
         
-        i = j = 0
-        while i < len(left_unaligned) or j < len(right_unaligned):
-            if i < len(left_unaligned) and j < len(right_unaligned):
-                left_seg = left_unaligned[i]
-                right_seg = right_unaligned[j]
+        # Для каждого сегмента производного ищем лучший матч в основном
+        for primary_seg in primary_unaligned:
+            best_match = None
+            best_ratio = 0
+            
+            for secondary_seg in secondary_unaligned:
+                # Улучшенное сравнение
+                ratio = self.calculate_text_similarity(primary_seg.text, secondary_seg.text)
                 
-                # Проверяем сходство
-                left_clean = re.sub(r'\s+', ' ', left_seg.text.lower())
-                right_clean = re.sub(r'\s+', ' ', right_seg.text.lower())
-                ratio = SequenceMatcher(None, left_clean, right_clean).ratio()
-                
-                if ratio > MIN_MATCH_RATIO:
-                    # Нашли совпадение
-                    self.alignment_map.append((left_seg, right_seg))
-                    i += 1
-                    j += 1
+                if ratio > best_ratio and ratio > MIN_MATCH_RATIO:
+                    best_ratio = ratio
+                    best_match = secondary_seg
+            
+            if best_match:
+                # Нашли пару
+                primary_seg.aligned_with = best_match
+                best_match.aligned_with = primary_seg
+                secondary_unaligned.remove(best_match)
+            else:
+                # Не нашли пару - оставляем пустым
+                primary_seg.aligned_with = None
+        
+        # Строим карту выравнивания в правильном порядке
+        self.build_alignment_map(primary_is_left)
+        
+        # Добавляем оставшиеся невыровненные сегменты основного файла
+        remaining_secondary = [s for s in secondary_segments if s not in aligned_secondary and not s.aligned_with]
+        for secondary_seg in remaining_secondary:
+            if primary_is_left:
+                self.alignment_map.append((None, secondary_seg))
+            else:
+                self.alignment_map.append((secondary_seg, None))
+    
+    def build_alignment_map(self, primary_is_left):
+        """Строим карту выравнивания в правильном порядке"""
+        # Очищаем карту
+        self.alignment_map = []
+        
+        if primary_is_left:
+            # Левый - производный, правый - основной
+            for left_seg in self.left_segments:
+                if left_seg.aligned_with:
+                    self.alignment_map.append((left_seg, left_seg.aligned_with))
                 else:
-                    # Добавляем пустые ячейки
-                    if i < len(left_unaligned):
-                        self.alignment_map.append((left_unaligned[i], None))
-                        i += 1
-                    if j < len(right_unaligned):
-                        self.alignment_map.append((None, right_unaligned[j]))
-                        j += 1
-            elif i < len(left_unaligned):
-                self.alignment_map.append((left_unaligned[i], None))
-                i += 1
-            elif j < len(right_unaligned):
-                self.alignment_map.append((None, right_unaligned[j]))
-                j += 1
+                    self.alignment_map.append((left_seg, None))
+        else:
+            # Правый - производный, левый - основной
+            for right_seg in self.right_segments:
+                if right_seg.aligned_with:
+                    self.alignment_map.append((right_seg.aligned_with, right_seg))
+                else:
+                    self.alignment_map.append((None, right_seg))
     
     def detect_language(self, text):
-        """Определяю язык текста"""
-        if re.search(r'[\u0590-\u05FF]', text):
-            return 'hebrew'
-        elif re.search(r'[а-яё]', text.lower()):
-            return 'russian'
-        else:
+        """Определяю язык текста с улучшенной детекцией иврита"""
+        if not text or not text.strip():
             return 'english'
+        
+        text_clean = text.strip()
+        
+        # Иврит имеет приоритет - проверяем первые 100 символов
+        hebrew_pattern = r'[\u0590-\u05FF\uFB1D-\uFB4F]'  # Включая буквы с диакритикой
+        if re.search(hebrew_pattern, text_clean[:100]):
+            return 'hebrew'
+        
+        # Русский
+        if re.search(r'[а-яёА-ЯЁ]', text_clean[:100]):
+            return 'russian'
+        
+        # По умолчанию английский
+        return 'english'
+    
+    def clean_text_for_xml(self, text):
+        """Очистка текста от недопустимых XML символов с сохранением иврита"""
+        if not text:
+            return ""
+        
+        # Удаляем NULL bytes и control characters, но сохраняем иврит
+        cleaned = ""
+        for char in text:
+            char_code = ord(char)
+            if char_code == 0:  # NULL
+                continue
+            elif char_code < 32 and char_code not in [9, 10, 13]:  # control chars except tab, LF, CR
+                continue
+            elif char_code > 0x10FFFF:  # beyond Unicode range
+                continue
+            else:
+                cleaned += char
+        
+        return cleaned
+    
+    def format_cell(self, cell, text):
+        """Форматирую ячейку с macOS-специфической поддержкой иврита"""
+        if not text.strip():
+            return
+            
+        # Очищаем текст от недопустимых символов
+        clean_text = self.clean_text_for_xml(text)
+        language = self.detect_language(clean_text)
+        
+        # Отладка
+        if language == 'hebrew':
+            self.log(f"Иврит detected: {clean_text[:30]}...")
+        
+        # Очищаем ячейку полностью
+        for paragraph in cell.paragraphs:
+            for run in paragraph.runs:
+                run._element.getparent().remove(run._element)
+        
+        paragraph = cell.paragraphs[0] if cell.paragraphs else cell.add_paragraph()
+        
+        if language == 'hebrew':
+            # macOS-специфический метод для иврита
+            try:
+                # Метод 1: macOS шрифты и XML
+                from docx.oxml import parse_xml
+                from docx.oxml.ns import qn
+                
+                # Создаем RTL параграф с macOS-специфическими настройками
+                paragraph._element.set(qn('w:bidi'), '1')
+                paragraph._element.set(qn('w:jc'), 'right')  # выравнивание вправо
+                paragraph._element.set(qn('w:textDirection'), 'rtl')
+                
+                # macOS шрифты для иврита
+                hebrew_fonts = ['David', 'New Peninim', 'Arial', 'Times New Roman']
+                
+                # Добавляем текст через XML с macOS шрифтами
+                run_xml = f'''
+                <w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                    <w:rPr>
+                        <w:rtl w:val="1"/>
+                        <w:rFonts w:ascii="{hebrew_fonts[0]}" w:hAnsi="{hebrew_fonts[0]}" w:cs="{hebrew_fonts[0]}"/>
+                        <w:sz w:val="22"/>
+                        <w:lang w:val="he-IL"/>
+                    </w:rPr>
+                    <w:t xml:space="preserve">{clean_text}</w:t>
+                </w:r>
+                '''
+                
+                run_element = parse_xml(run_xml)
+                paragraph._element.append(run_element)
+                
+                self.log(f"Иврит добавлен через macOS XML метод со шрифтом {hebrew_fonts[0]}")
+                
+            except Exception as e:
+                self.log(f"macOS XML метод не сработал: {e}, пробую стандартный")
+                
+                # Метод 2: Стандартный с macOS шрифтами
+                run = paragraph.add_run(clean_text)
+                paragraph.paragraph_format.right_to_left = True
+                
+                # macOS шрифты для иврита
+                mac_hebrew_fonts = ['David', 'New Peninim', 'Arial Hebrew', 'Arial']
+                
+                # Пробуем разные шрифты
+                font_set = False
+                for font in mac_hebrew_fonts:
+                    try:
+                        run.font.name = font
+                        run.font.rtl = True
+                        run.font.size = Pt(11)
+                        font_set = True
+                        self.log(f"Использован macOS шрифт: {font}")
+                        break
+                    except:
+                        continue
+                
+                if not font_set:
+                    # Fallback на Arial
+                    run.font.name = 'Arial'
+                    run.font.rtl = True
+                    run.font.size = Pt(11)
+                
+                # macOS-специфические BIDI настройки
+                try:
+                    paragraph._element.set(qn('w:bidi'), '1')
+                    paragraph._element.set(qn('w:textDirection'), 'rtl')
+                    run._element.set(qn('w:rtl'), '1')
+                    run._element.set(qn('w:lang'), 'he-IL')
+                except:
+                    pass
+                
+                try:
+                    from docx.oxml.shared import OxmlElement
+                    bidi = OxmlElement('w:bidi')
+                    bidi.set(qn('w:val'), '1')
+                    run._rPr.append(bidi)
+                    
+                    # Добавляем язык для macOS
+                    lang = OxmlElement('w:lang')
+                    lang.set(qn('w:val'), 'he-IL')
+                    run._rPr.append(lang)
+                    
+                except:
+                    pass
+                
+        else:
+            # Стандартный метод для русского/английского
+            run = paragraph.add_run(clean_text)
+            paragraph.paragraph_format.right_to_left = False
+            run.font.name = 'Times New Roman'
+            run.font.size = Pt(10)
+            
+            try:
+                paragraph._element.set(qn('w:bidi'), '0')
+                run._element.set(qn('w:rtl'), '0')
+            except:
+                pass
     
     def create_docx(self, left_path, right_path, output_path):
-        """Создаю DOCX документ"""
+        """Создаю DOCX документ с улучшенной поддержкой иврита"""
+        output_full = os.path.abspath(output_path)
         self.log(f"Создание DOCX: {os.path.basename(output_path)}")
+        self.log(f"Полный путь: {output_full}")
         
         doc = Document()
         
@@ -263,43 +500,118 @@ class SynchroMaster:
         
         doc.save(output_path)
         self.log(f"DOCX сохранен: {os.path.basename(output_path)}", "DONE")
+        self.log(f"Полный путь: {output_full}", "DONE")
     
-    def format_cell(self, cell, text):
-        """Форматирую ячейку с учетом языка"""
-        if not text.strip():
-            return
-            
-        language = self.detect_language(text)
+    def read_file_safe(self, file_path):
+        """Безопасное чтение файла с разными кодировками и отладкой иврита"""
+        encodings = ['utf-8', 'utf-8-sig', 'cp1255', 'cp1252', 'latin-1', 'utf-16']
         
-        # Очищаем ячейку
-        for paragraph in cell.paragraphs:
-            for run in paragraph.runs:
-                run._element.getparent().remove(run._element)
+        self.log(f"Попытка чтения файла: {os.path.basename(file_path)}")
         
-        paragraph = cell.paragraphs[0] if cell.paragraphs else cell.add_paragraph()
-        run = paragraph.add_run(text)
+        for encoding in encodings:
+            try:
+                with open(file_path, 'r', encoding=encoding) as f:
+                    text = f.read()
+                    
+                # Проверяем наличие иврита
+                if re.search(r'[\u0590-\u05FF]', text):
+                    self.log(f"Найден иврит в файле, кодировка: {encoding}")
+                    # Нормализация Unicode для иврита
+                    import unicodedata
+                    text = unicodedata.normalize('NFC', text)
+                    self.log(f"Иврит нормализован, пример: {text[:50]}...")
+                
+                return text
+                
+            except UnicodeDecodeError:
+                continue
+            except Exception as e:
+                self.log(f"Ошибка чтения файла {file_path}: {e}", "ERROR")
+                return None
         
-        if language == 'hebrew':
-            # RTL для иврита
-            paragraph.paragraph_format.right_to_left = True
-            run.font.name = 'Arial'
-            run.font.rtl = True
+        self.log(f"Не удалось прочитать файл {file_path} ни в одной кодировке", "ERROR")
+        return None
+    
+    def calculate_similarity_stats(self):
+        """Подсчитываю статистику сходства с улучшенным алгоритмом"""
+        total_pairs = len(self.alignment_map)
+        aligned_pairs = 0
+        total_similarity = 0
+        high_similarity = 0
+        medium_similarity = 0
+        low_similarity = 0
+        
+        for left_seg, right_seg in self.alignment_map:
+            if left_seg and right_seg:
+                aligned_pairs += 1
+                
+                # Используем улучшенное сравнение
+                ratio = self.calculate_text_similarity(left_seg.text, right_seg.text)
+                total_similarity += ratio
+                
+                # Категоризируем сходство
+                if ratio >= 0.8:
+                    high_similarity += 1
+                elif ratio >= 0.5:
+                    medium_similarity += 1
+                else:
+                    low_similarity += 1
+        
+        # Процентное соотношение
+        alignment_rate = (aligned_pairs / total_pairs * 100) if total_pairs > 0 else 0
+        avg_similarity = (total_similarity / aligned_pairs * 100) if aligned_pairs > 0 else 0
+        
+        stats = {
+            'total_pairs': total_pairs,
+            'aligned_pairs': aligned_pairs,
+            'empty_left': total_pairs - aligned_pairs,
+            'empty_right': total_pairs - aligned_pairs,
+            'alignment_rate': alignment_rate,
+            'avg_similarity': avg_similarity,
+            'high_similarity': high_similarity,
+            'medium_similarity': medium_similarity,
+            'low_similarity': low_similarity
+        }
+        
+        return stats
+    
+    def log_similarity_stats(self, stats):
+        """Вывожу статистику в лог"""
+        self.log("\n📊 СТАТИСТИКА СХОДСТВА:")
+        self.log(f"  Всего пар:           {stats['total_pairs']}")
+        self.log(f"  Выровненных пар:      {stats['aligned_pairs']} ({stats['alignment_rate']:.1f}%)")
+        self.log(f"  Пустых ячеек слева:  {stats['empty_left']}")
+        self.log(f"  Пустых ячеек справа: {stats['empty_right']}")
+        self.log(f"  Среднее сходство:    {stats['avg_similarity']:.1f}%")
+        self.log(f"  Высокое сходство:     {stats['high_similarity']} (≥80%)")
+        self.log(f"  Среднее сходство:     {stats['medium_similarity']} (50-79%)")
+        self.log(f"  Низкое сходство:      {stats['low_similarity']} (<50%)")
+        
+        if stats['alignment_rate'] < 50:
+            self.log("⚠️  Низкий процент выравнивания - возможно, файлы не соответствуют друг другу", "WARN")
+        elif stats['avg_similarity'] < 60:
+            self.log("⚠️  Низкое сходство текстов - возможно, разные версии или язык", "WARN")
         else:
-            # LTR для русского/английского
-            paragraph.paragraph_format.right_to_left = False
-            run.font.name = 'Times New Roman'
-        
-        run.font.size = Pt(10)
+            self.log("✅ Хорошее выравнивание и сходство текстов", "DONE")
     
     def process_files(self, left_path, right_path, output_path):
         """Основной процесс синхронизации"""
-        self.log(f"Старт синхронизации: {os.path.basename(left_path)} ↔ {os.path.basename(right_path)}")
+        left_full = os.path.abspath(left_path)
+        right_full = os.path.abspath(right_path)
+        output_full = os.path.abspath(output_path)
         
-        # Читаем файлы
-        with open(left_path, 'r', encoding='utf-8') as f:
-            left_text = f.read()
-        with open(right_path, 'r', encoding='utf-8') as f:
-            right_text = f.read()
+        self.log(f"Старт синхронизации:")
+        self.log(f"  Левый файл:  {left_full}")
+        self.log(f"  Правый файл: {right_full}")
+        self.log(f"  Выходной:    {output_full}")
+        
+        # Читаем файлы с обработкой кодировок
+        left_text = self.read_file_safe(left_path)
+        right_text = self.read_file_safe(right_path)
+        
+        if left_text is None or right_text is None:
+            self.log("Ошибка чтения файлов", "ERROR")
+            return
         
         # Предварительная обработка
         self.log("Предварительная обработка текстов...")
@@ -318,8 +630,32 @@ class SynchroMaster:
         
         self.log(f"Выравнивание завершено: {len(self.alignment_map)} пар")
         
+        # Считаем и выводим статистику сходства
+        stats = self.calculate_similarity_stats()
+        self.log_similarity_stats(stats)
+        
         # Создаем DOCX
         self.create_docx(left_path, right_path, output_path)
+        
+        # Спросить об открытии файла
+        try:
+            response = input(f"\nОткрыть созданный файл? {output_full} [y/N]: ").strip().lower()
+            if response in ['y', 'yes', 'да', 'д']:
+                import subprocess
+                import platform
+                
+                if platform.system() == 'Darwin':  # macOS
+                    subprocess.run(['open', output_full])
+                elif platform.system() == 'Windows':
+                    subprocess.run(['start', output_full], shell=True)
+                elif platform.system() == 'Linux':
+                    subprocess.run(['xdg-open', output_full])
+                
+                self.log("Файл открыт для просмотра")
+        except KeyboardInterrupt:
+            self.log("Отмена открытия файла")
+        except Exception as e:
+            self.log(f"Ошибка открытия файла: {e}", "WARN")
     
     def export_corrections(self, docx_path, output_md_path):
         """Экспорт правок из правой колонки"""

@@ -59,8 +59,125 @@ PROMPT_TEMPLATES = {
         "5. ЯЗЫК: Сохраняй оригинальный язык текста БЕЗ ИЗМЕНЕНИЙ.\n\n"
         "ВЕРНИ РЕЗУЛЬТАТ В MARKDOWN. НЕ ПЕРЕВОДИ НИЧЕГО!"
     ),
+    "MULTILANG": (
+        "ТЫ — МНОГОЯЗЫЧНЫЙ РЕДАКТОР-ФОРМАТЕР. ПЕРЕД ТОБОЙ ТЕКСТ НА ЛЮБОМ ЯЗЫКЕ.\n\n"
+        "ВАЖНОЕ ПРАВИЛО: НЕ ПЕРЕВОДИ ТЕКСТ! Сохраняй язык оригинала БЕЗ ИЗМЕНЕНИЙ.\n\n"
+        "ТВОЯ ЗАДАЧА:\n"
+        "1. ОПРЕДЕЛИ ЯЗЫК: Определи язык текста (иврит, русский, английский, испанский, и т.д.).\n"
+        "2. ОФОРМЛЕНИЕ: Разбей текст на логические абзацы. Добавь заголовки '#' для тем.\n"
+        "3. ЧИСТКА: Удали слова-паразиты, повторы, ошибки распознавания.\n"
+        "4. СТРУКТУРА: Объедини короткие сегменты в осмысленные абзацы.\n"
+        "5. ЦИТАТЫ: Выделяй цитаты '**текст**'.\n"
+        "6. ЯЗЫК: Сохраняй оригинальный язык текста БЕЗ ИЗМЕНЕНИЙ.\n\n"
+        "ВЕРНИ РЕЗУЛЬТАТ В MARKDOWN. НЕ ПЕРЕВОДИ НИЧЕГО!"
+    ),
+    "TRANSLATE_TO_RU": (
+        "ТЫ — ПРОФЕССИОНАЛЬНЫЙ ПЕРЕВОДЧИК. ПЕРЕД ТОБОЙ ТЕКСТ НА ЛЮБОМ ЯЗЫКЕ.\n\n"
+        "ЗАДАЧА: Переведи текст на РУССКИЙ язык, сохранив структуру и смысл.\n\n"
+        "ПРАВИЛА ПЕРЕВОДА:\n"
+        "1. ТОЧНОСТЬ: Сохрани оригинальный смысл и стиль.\n"
+        "2. СТРУКТУРА: Сохраняй абзацы и заголовки '#' из оригинала.\n"
+        "3. ЦИТАТЫ: Сохраняй выделение цитат '**текст**'.\n"
+        "4. ТЕРМИНОЛОГИЯ: Используй подходящую терминологию для религиозных/философских текстов.\n"
+        "5. ЕСТЕСТВЕННОСТЬ: Перевод должен звучать естественно на русском.\n\n"
+        "ВЕРНИ РЕЗУЛЬТАТ В MARKDOWN НА РУССКОМ ЯЗЫКЕ."
+    ),
+    "TRANSLATE_TO_EN": (
+        "ТЫ — ПРОФЕССИОНАЛЬНЫЙ ПЕРЕВОДЧИК. ПЕРЕД ТОБОЙ ТЕКСТ НА ЛЮБОМ ЯЗЫКЕ.\n\n"
+        "ЗАДАЧА: Переведи текст на АНГЛИЙСКИЙ язык, сохранив структуру и смысл.\n\n"
+        "ПРАВИЛА ПЕРЕВОДА:\n"
+        "1. ТОЧНОСТЬ: Сохрани оригинальный смысл и стиль.\n"
+        "2. СТРУКТУРА: Сохраняй абзацы и заголовки '#' из оригинала.\n"
+        "3. ЦИТАТЫ: Сохраняй выделение цитат '**текст**'.\n"
+        "4. ТЕРМИНОЛОГИЯ: Используй подходящую терминологию для религиозных/философских текстов.\n"
+        "5. ЕСТЕСТВЕННОСТЬ: Перевод должен звучать естественно на английском.\n\n"
+        "ВЕРНИ РЕЗУЛЬТАТ В MARKDOWN НА АНГЛИЙСКОМ ЯЗЫКЕ."
+    ),
+    "TRANSLATE_TO_HE": (
+        "ТЫ — ПРОФЕССИОНАЛЬНЫЙ ПЕРЕВОДЧИК. ПЕРЕД ТОБОЙ ТЕКСТ НА ЛЮБОМ ЯЗЫКЕ.\n\n"
+        "ЗАДАЧА: Переведи текст на ИВРИТ, сохранив структуру и смысл.\n\n"
+        "ПРАВИЛА ПЕРЕВОДА:\n"
+        "1. ТОЧНОСТЬ: Сохрани оригинальный смысл и стиль.\n"
+        "2. СТРУКТУРА: Сохраняй абзацы и заголовки '#' из оригинала.\n"
+        "3. ЦИТАТЫ: Сохраняй выделение цитат '**текст**'.\n"
+        "4. ТЕРМИНОЛОГИЯ: Используй подходящую терминологию для религиозных/философских текстов.\n"
+        "5. ЕСТЕСТВЕННОСТЬ: Перевод должен звучать естественно на иврите.\n\n"
+        "ВЕРНИ РЕЗУЛЬТАТ В MARKDOWN НА ИВРИТЕ."
+    ),
+    "CUSTOM": (
+        "ТЫ — УНИВЕРСАЛЬНЫЙ РЕДАКТОР. ПЕРЕД ТОБОЙ ТЕКСТ.\n\n"
+        "ИНСТРУКЦИЯ: {custom_instruction}\n\n"
+        "ПРАВИЛА:\n"
+        "1. Сохрани структуру текста (абзацы, заголовки).\n"
+        "2. Примени указанные правила форматирования.\n"
+        "3. ВЕРНИ РЕЗУЛЬТАТ В MARKDOWN."
+    ),
     "GENERAL": "Оформи текст в Markdown, расставь абзацы и логические заголовки."
 }
+
+def detect_language_auto(text):
+    """Автоматическое определение языка текста"""
+    if not text or not text.strip():
+        return 'unknown'
+    
+    text_sample = text[:500]  # Анализируем первые 500 символов
+    
+    # Иврит
+    hebrew_pattern = r'[\u0590-\u05FF\uFB1D-\uFB4F]'
+    hebrew_chars = len(re.findall(hebrew_pattern, text_sample))
+    if hebrew_chars > 5:
+        return 'hebrew'
+    
+    # Русский
+    russian_chars = len(re.findall(r'[а-яёА-ЯЁ]', text_sample))
+    if russian_chars > 10:
+        return 'russian'
+    
+    # Арабский
+    arabic_pattern = r'[\u0600-\u06FF]'
+    arabic_chars = len(re.findall(arabic_pattern, text_sample))
+    if arabic_chars > 5:
+        return 'arabic'
+    
+    # Китайский
+    chinese_pattern = r'[\u4e00-\u9fff]'
+    chinese_chars = len(re.findall(chinese_pattern, text_sample))
+    if chinese_chars > 5:
+        return 'chinese'
+    
+    # Японский
+    japanese_pattern = r'[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9fff]'
+    japanese_chars = len(re.findall(japanese_pattern, text_sample))
+    if japanese_chars > 5:
+        return 'japanese'
+    
+    # Корейский
+    korean_pattern = r'[\uac00-\ud7af]'
+    korean_chars = len(re.findall(korean_pattern, text_sample))
+    if korean_chars > 5:
+        return 'korean'
+    
+    # Испанский (проверка по характерным буквам)
+    spanish_chars = len(re.findall(r'[ñÑáÁéÉíÍóÓúÚüÜ¿¡]', text_sample))
+    if spanish_chars > 2:
+        return 'spanish'
+    
+    # Французский (проверка по акцентам)
+    french_chars = len(re.findall(r'[àâäéèêëïîôöùûüÿç]', text_sample))
+    if french_chars > 2:
+        return 'french'
+    
+    # Немецкий
+    german_chars = len(re.findall(r'[äöüßÄÖÜ]', text_sample))
+    if german_chars > 2:
+        return 'german'
+    
+    # По умолчанию - английский (если есть латиница)
+    latin_chars = len(re.findall(r'[a-zA-Z]', text_sample))
+    if latin_chars > 20:
+        return 'english'
+    
+    return 'unknown'
 
 def find_best_model(api_key, is_large_text=True):
     """Ищет доступную модель Gemini"""
@@ -114,9 +231,32 @@ def run_refining(raw_path=None, mode="YT"):
 
     # 2. Определение режима и логирование промпта
     mode_key = mode.upper()
-    instruction = PROMPT_TEMPLATES.get(mode_key, PROMPT_TEMPLATES["GENERAL"])
     
-    utils.tbox_log(f"MODE: {mode_key} | Prompt: {instruction[:60]}...", META, "INFO")
+    # Автоопределение языка для MULTILANG
+    if mode_key == "MULTILANG":
+        detected_language = detect_language_auto(content)
+        language_names = {
+            'hebrew': 'иврит',
+            'russian': 'русский', 
+            'english': 'английский',
+            'spanish': 'испанский',
+            'french': 'французский',
+            'german': 'немецкий',
+            'unknown': 'неизвестный'
+        }
+        lang_name = language_names.get(detected_language, 'неизвестный')
+        utils.tbox_log(f"DETECTED LANGUAGE: {lang_name}", META, "INFO")
+    
+    # Обработка кастомного промпта
+    if mode_key.startswith("CUSTOM:"):
+        custom_instruction = mode_key[7:]  # Убираем "CUSTOM:"
+        instruction = PROMPT_TEMPLATES["CUSTOM"].format(custom_instruction=custom_instruction)
+        mode_display = f"CUSTOM: {custom_instruction[:30]}..."
+    else:
+        instruction = PROMPT_TEMPLATES.get(mode_key, PROMPT_TEMPLATES["GENERAL"])
+        mode_display = mode_key
+    
+    utils.tbox_log(f"MODE: {mode_display} | Prompt: {instruction[:60]}...", META, "INFO")
 
     # 3. Подготовка API
     api_key = CONF.get('API_KEY', '').split('#')[0].strip()
@@ -172,7 +312,7 @@ def run_refining(raw_path=None, mode="YT"):
         if is_rtl:
             f.write(f'<div dir="rtl">\n\n# {display_title}\n\n{refined_full}\n\n</div>')
         else:
-            f.write(f"# {display_title}\n\n{refined_full}")
+            f.write(f'# {display_title}\n\n{refined_full}')
     
     # Word
     docx_path = os.path.join(CONF.get('DOC_ORIGINALS'), f"{base_name}.docx")

@@ -70,7 +70,36 @@ def main():
         
         tbox_log("Запрос субтитров через YouTube Transcript API...", META, "INFO", CONF)
         api = YouTubeTranscriptApi()
-        transcript_data = api.list(vid).find_transcript(['he', 'iw', 'en']).fetch()
+        
+        # Пытаемся найти субтитры в порядке приоритета
+        transcript_data = None
+        languages_to_try = ['he', 'iw', 'ru', 'en']  # Добавили русский
+        
+        # Сначала пробуем найти транскрипт
+        transcript_list = api.list(vid)
+        
+        for lang in languages_to_try:
+            try:
+                transcript_data = transcript_list.find_transcript([lang]).fetch()
+                tbox_log(f"Найдены субтитры на языке: {lang}", META, "INFO", CONF)
+                break
+            except:
+                continue
+        
+        # Если не нашли, пробуем перевести
+        if not transcript_data:
+            try:
+                # Ищем любой транскрипт для перевода
+                any_transcript = transcript_list.find_generated_transcript(['ru', 'en'])
+                if any_transcript:
+                    transcript_data = any_transcript.translate('en').fetch()
+                    tbox_log("Использованы переведенные субтитры", META, "INFO", CONF)
+            except:
+                pass
+        
+        if not transcript_data:
+            tbox_log("Не найдены подходящие субтитры для этого видео", META, "ERROR", CONF)
+            return
         
         # Твой надежный парсинг из 4.1
         full_text_list = []
@@ -98,8 +127,8 @@ def main():
         # 3. REFINERY (Вызов обновленного процесса)
         tbox_log("Запуск процесса ОБЛАГОРАЖИВАНИЯ (Refinery)...", META, "INFO", CONF)
         
-        # Передаем путь к файлу в новый рефайнер, который умеет делать паузы
-        refiner.run_refining(raw_path, mode="YT")
+        # Передаем путь к файлу в новый рефайнер с поддержкой любых языков
+        refiner.run_refining(raw_path, mode="MULTILANG")
         
         tbox_log(f"--- ЗАВЕРШЕНО: {base_name} ---", META, "DONE", CONF)
 

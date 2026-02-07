@@ -47,11 +47,12 @@ def load_prompts(conf):
             with open(prompts_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             # Парсинг по заголовкам # CODE
-            sections = re.split(r'^# ([\w-]+)$', content, flags=re.MULTILINE)
+            sections = re.split(r'^# (.+)$', content, flags=re.MULTILINE)
             for i in range(1, len(sections), 2):
                 code = sections[i].strip()
                 text = sections[i+1].strip()
                 prompts[code] = text
+            tbox_log(f"Загружено промптов: {list(prompts.keys())}", META, "INFO", conf)
         except Exception as e:
             tbox_log(f"Ошибка загрузки промптов: {e}", META, "ERROR", conf)
     else:

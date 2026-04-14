@@ -210,10 +210,11 @@ def find_best_model(api_key, is_large_text=True):
         except: continue
     return None, None
 
-def run_refining(raw_path=None, mode="YT"):
+def run_refining(raw_path=None, mode="YT", use_gpt=False):
     """
     Универсальная обработка ИИ.
     mode: "PDF", "YT" или "GENERAL"
+    use_gpt: Use GPT model instead of Gemini
     """
     CONF = utils.load_local_config()
     if not CONF: 
@@ -268,12 +269,24 @@ def run_refining(raw_path=None, mode="YT"):
     
     utils.tbox_log(f"MODE: {mode_display} | Prompt: {instruction[:60]}...", META, "INFO")
 
-    # 3. Подготовка API
-    api_key = CONF.get('API_KEY', '').split('#')[0].strip()
-    m_name, m_ver = find_best_model(api_key, len(content) > 5000)
-    if not m_name:
-        utils.tbox_log("Gemini API недоступен.", META, "ERROR")
-        return
+    # 3. API preparation
+    if use_gpt:
+        # Use GPT model
+        openai_key = CONF.get('OPENAI_API_KEY', '').split('#')[0].strip()
+        if not openai_key:
+            utils.tbox_log("OpenAI API key not found for GPT mode", META, "ERROR")
+            return
+        m_name = CONF.get('MODEL_GPT', 'gpt-4').strip()
+        m_ver = "openai"
+        utils.tbox_log(f"Using GPT model: {m_name}", META, "INFO")
+    else:
+        # Use Gemini model
+        api_key = CONF.get('API_KEY', '').split('#')[0].strip()
+        m_name, m_ver = find_best_model(api_key, len(content) > 5000)
+        if not m_name:
+            utils.tbox_log("Gemini API unavailable.", META, "ERROR")
+            return
+        utils.tbox_log(f"Selected model: {m_name} ({m_ver})", META, "INFO")
 
     # 4. Нарезка и цикл обработки
     chunks = utils.tbox_chunk_text(content, max_chars=8000)
@@ -284,7 +297,7 @@ def run_refining(raw_path=None, mode="YT"):
             utils.tbox_log("Пауза 15 сек (лимиты API)...", META, "INFO")
             time.sleep(15)
             
-        utils.tbox_log(f"Обработка части {i}/{len(chunks)}...", META, "START")
+        utils.tbox_log(f"Обработка части {i}/{len(chunks)} ({m_name})...", META, "START")
         
         # Склеиваем инструкцию и текст здесь
         prompt = (
@@ -293,17 +306,42 @@ def run_refining(raw_path=None, mode="YT"):
             f"{chunk}"
         )
         
-        url = f"https://generativelanguage.googleapis.com/{m_ver}/models/{m_name}:generateContent?key={api_key}"
+        # API call based on model type
+        if m_ver == "openai":
+            # GPT API call
+            url = f"https://api.openai.com/v1/chat/completions"
+            headers = {"Authorization": f"Bearer {openai_key}"}
+            json_data = {
+                "model": m_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.3
+            }
+        else:
+            # Gemini API call
+            url = f"https://generativelanguage.googleapis.com/{m_ver}/models/{m_name}:generateContent?key={api_key}"
+            headers = {"Content-Type": "application/json"}
+            json_data = {"contents": [{"parts": [{"text": prompt}]}]}
 
         try:
-            r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=400)
+            r = requests.post(url, headers=headers, json=json_data, timeout=400)
             res = r.json()
-            if 'candidates' in res and res['candidates'][0].get('content'):
-                chunk_result = res['candidates'][0]['content']['parts'][0]['text']
-                refined_full += chunk_result.strip() + "\n\n"
+            
+            if m_ver == "openai":
+                # GPT response parsing
+                if 'choices' in res and res['choices'][0].get('message'):
+                    chunk_result = res['choices'][0]['message']['content']
+                    refined_full += chunk_result.strip() + "\n\n"
+                else:
+                    utils.tbox_log(f"Chunk {i} rejected, using original.", META, "WARNING")
+                    refined_full += chunk + "\n\n"
             else:
-                utils.tbox_log(f"Чанк {i} отклонен, берем оригинал.", META, "WARNING")
-                refined_full += chunk + "\n\n"
+                # Gemini response parsing
+                if 'candidates' in res and res['candidates'][0].get('content'):
+                    chunk_result = res['candidates'][0]['content']['parts'][0]['text']
+                    refined_full += chunk_result.strip() + "\n\n"
+                else:
+                    utils.tbox_log(f"Chunk {i} rejected, using original.", META, "WARNING")
+                    refined_full += chunk + "\n\n"
         except Exception as e:
             utils.tbox_log(f"Ошибка чанка {i}: {e}", META, "ERROR")
             refined_full += chunk + "\n\n"

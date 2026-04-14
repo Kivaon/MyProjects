@@ -301,6 +301,7 @@ def main():
     parser.add_argument('-md', action='store_true', help='Использовать последний md из MD_DIR')
     parser.add_argument('-s', action='store_true', help='Включать оригинал цитат')
     parser.add_argument('-p', '--prompt', type=str, help='Код промпта (TORAH, FICTION, GENERIC)', dest='prompt')
+    parser.add_argument('-GPT', action='store_true', help='Use GPT model instead of Gemini')
     args = parser.parse_args()
     
     CONF = load_tbox_config()

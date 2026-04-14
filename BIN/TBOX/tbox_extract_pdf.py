@@ -10,8 +10,8 @@ except ImportError:
     refinery = None
 
 # --- ПАСПОРТ ---
-VERSION = "v2.2.column-aware"
-DATE    = "2026-01-30"
+VERSION = "v3.00.git-structure"
+DATE    = "2026-04-14"
 NAME    = os.path.basename(__file__)
 META    = {"name": NAME, "version": VERSION, "date": DATE}
 

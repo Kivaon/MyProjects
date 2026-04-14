@@ -9,8 +9,8 @@ from tbox_utils import tbox_log
 
 
 # --- MANIFEST ---
-VERSION = "v6.00.hybrid_pro"
-DATE    = "2026-01-27"
+VERSION = "v7.00.git-structure"
+DATE    = "2026-04-14"
 NAME    = os.path.basename(__file__)
 META    = {"name": NAME, "version": VERSION}
 

@@ -13,8 +13,8 @@ except ImportError:
     sys.exit(1)
 
 # --- ПАСПОРТ ---
-VERSION = "v4.2.final"
-DATE    = "2026-01-25"
+VERSION = "v5.00.git-structure"
+DATE    = "2026-04-14"
 NAME    = os.path.basename(__file__)
 META    = {"name": NAME, "version": VERSION, "date": DATE}
 

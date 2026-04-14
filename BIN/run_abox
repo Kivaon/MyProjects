@@ -1,0 +1,4 @@
+#!/bin/bash
+export PYTHONPATH="/Users/kivaonmac/Documents/AI_Lab/BIN/TBOX:$PYTHONPATH"
+cd "/Users/kivaonmac/Documents/AI_Lab/BIN/ABOX"
+python3 "$@"

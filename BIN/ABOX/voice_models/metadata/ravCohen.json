@@ -1,0 +1,10 @@
+{
+  "voice_id": "ravCohen",
+  "name": "Rav Shaul Kohen",
+  "language": "ru",
+  "samples_count": 134,
+  "model_type": "xtts_v2",
+  "model_path": null,
+  "created_date": "2026-02-10T19:21:09.187355",
+  "status": "samples_ready"
+}

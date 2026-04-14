@@ -1,0 +1,56 @@
+# ABOX Configuration - Audio Box
+# Настройки для системы озвучки
+
+# Базовая директория
+BASE_DIR=/Users/kivaonmac/Documents/AI_Lab
+
+# Голосовые настройки
+DEFAULT_VOICE=ru-RU-DmitryNeural
+SPEED=normal
+PITCH=medium
+VOLUME=1.0
+
+# Пути к данным
+AUDIO_DIR=06_AUDIO/IN
+VOICE_MODELS_DIR=ABOX/data/models
+DICTIONARIES_DIR=ABOX/data/dictionaries
+OCR_DIR=01_INBOX
+DEFAULT_OCR_NAME=Agreement
+
+# TTS настройки
+MAX_CHARS_PER_CHUNK=3000
+OUTPUT_FORMAT=mp3
+SAMPLE_RATE=24000
+
+# Логирование
+LOG_LEVEL=INFO
+LOG_FILE=BIN/_logs/abox.log
+
+# Предобработка
+ENABLE_STRESS_CORRECTION=true
+ENABLE_PUNCTUATION_FIX=true
+ENABLE_ERROR_CORRECTION=true
+
+# Визуализация
+ENABLE_VISUALIZATION=true
+VISUALIZATION_FORMAT=html
+
+# Модели голосов
+ETHALON_VOICE_DIR=06_AUDIO/VOICE
+VOICE_MODEL_EXTENSION=onnx
+
+# Кэширование
+ENABLE_CACHE=true
+CACHE_DIR=shared/cache
+CACHE_SIZE=100MB
+
+# Временные файлы
+TEMP_DIR=shared/temp
+CLEANUP_TEMP=true
+
+# Экспериментальные функции
+ENABLE_AI_PUNCTUATION=false
+ENABLE_VOICE_CLONING=false
+
+# AI API ключи
+GEMINI_API_KEY=AIzaSyDkX8R8p6Qh7L9vK2mF3nG5jH7qK9rX8w

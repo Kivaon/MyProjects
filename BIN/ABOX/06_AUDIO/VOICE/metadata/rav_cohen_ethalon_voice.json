@@ -1,0 +1,164 @@
+{
+  "name": "rav_cohen_ethalon",
+  "display_name": "Эталонный голос (иврит)",
+  "language": "hebrew",
+  "gender": "neutral",
+  "age": "adult",
+  "description": "Стандартизированное произношение иврита",
+  "created": "2026-02-10T20:13:35.208992",
+  "examples_count": 38,
+  "examples": [
+    {
+      "text": "א",
+      "description": "Алеф"
+    },
+    {
+      "text": "ב",
+      "description": "Бет"
+    },
+    {
+      "text": "ג",
+      "description": "Гимель"
+    },
+    {
+      "text": "ד",
+      "description": "Далет"
+    },
+    {
+      "text": "ה",
+      "description": "Гей"
+    },
+    {
+      "text": "ו",
+      "description": "Вав"
+    },
+    {
+      "text": "ז",
+      "description": "Заин"
+    },
+    {
+      "text": "ט",
+      "description": "Тет"
+    },
+    {
+      "text": "י",
+      "description": "Йуд"
+    },
+    {
+      "text": "כ",
+      "description": "Ламед"
+    },
+    {
+      "text": "מ",
+      "description": "Мем"
+    },
+    {
+      "text": "נ",
+      "description": "Нун"
+    },
+    {
+      "text": "ס",
+      "description": "Самех"
+    },
+    {
+      "text": "ע",
+      "description": "Аин"
+    },
+    {
+      "text": "פ",
+      "description": "Пэ"
+    },
+    {
+      "text": "צ",
+      "description": "Цади"
+    },
+    {
+      "text": "ק",
+      "description": "Куф"
+    },
+    {
+      "text": "ר",
+      "description": "Реш"
+    },
+    {
+      "text": "ש",
+      "description": "Шин"
+    },
+    {
+      "text": "ת",
+      "description": "Тав"
+    },
+    {
+      "text": "אָ",
+      "description": "Камац"
+    },
+    {
+      "text": "אֹ",
+      "description": "Хатаф"
+    },
+    {
+      "text": "אִ",
+      "description": "Хирик"
+    },
+    {
+      "text": "אֶ",
+      "description": "Цади"
+    },
+    {
+      "text": "אַ",
+      "description": "Патах"
+    },
+    {
+      "text": "אָ",
+      "description": "Камац с огласовкой"
+    },
+    {
+      "text": "שלום",
+      "description": "Шалом"
+    },
+    {
+      "text": "תודה",
+      "description": "Тода"
+    },
+    {
+      "text": "ברכה",
+      "description": "Баруха"
+    },
+    {
+      "text": "אמן",
+      "description": "Амин"
+    },
+    {
+      "text": "תודה",
+      "description": "Тода"
+    },
+    {
+      "text": "מצוות",
+      "description": "Командование"
+    },
+    {
+      "text": "לימוש",
+      "description": "Изучение"
+    },
+    {
+      "text": "עבודה",
+      "description": "Работа"
+    },
+    {
+      "text": "משפח",
+      "description": "Семья"
+    },
+    {
+      "text": "תורה",
+      "description": "Тора"
+    },
+    {
+      "text": "מצוות",
+      "description": "Командование"
+    },
+    {
+      "text": "לימוש",
+      "description": "Изучение"
+    }
+  ]
+}

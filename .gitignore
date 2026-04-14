@@ -1,10 +1,25 @@
-config.txt
-factory.log
-01_INBOX/
-02_TXT/
-03_DOC/
-04_PUB/
-05_ARH/
+# Exclude everything except BIN
+/*
+!/BIN/
+
+# Exclude specific files and patterns
 .DS_Store
-bin/__pycache__/
+__pycache__/
 *.pyc
+*.log
+factory.log
+config.txt
+
+# Exclude data directories (even if they were inside BIN)
+BIN/01_INBOX/
+BIN/02_TXT/
+BIN/03_DOC/
+BIN/04_PUB/
+BIN/05_ARH/
+BIN/06_AUDIO/
+
+# Exclude cache and temp files
+BIN/_logs/
+*.tmp
+*.bak
+*~

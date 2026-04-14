@@ -1,0 +1,12 @@
+{
+  "ravCohen": {
+    "voice_id": "ravCohen",
+    "name": "Rav Shaul Kohen",
+    "language": "ru",
+    "samples_count": 134,
+    "model_type": "xtts_v2",
+    "model_path": "/Users/kivaonmac/Documents/AI_Lab/BIN/ABOX/voice_models/models/ravCohen_xtts",
+    "created_date": "2026-02-10T19:21:09.187355",
+    "status": "model_trained"
+  }
+}

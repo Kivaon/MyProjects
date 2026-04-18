@@ -6,8 +6,9 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from tbox_utils import tbox_log
 
 # --- MANIFEST ---
-VERSION = "v2.9.master_print"
-DATE    = "2026-01-23"
+# Previous: v2.9.master_print (2026-01-23) - Master print version
+VERSION = "v3.0.print-pro"
+DATE    = "2026-04-18"
 NAME    = os.path.basename(__file__)
 META    = {"name": NAME, "version": VERSION}
 

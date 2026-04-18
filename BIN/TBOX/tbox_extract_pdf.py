@@ -10,10 +10,192 @@ except ImportError:
     refinery = None
 
 # --- ПАСПОРТ ---
-VERSION = "v3.00.git-structure"
-DATE    = "2026-04-14"
+# Previous: v2.2.column-aware (2026-01-30) - Added column detection
+VERSION = "v3.0.smart-segments"
+DATE    = "2026-04-18"
 NAME    = os.path.basename(__file__)
 META    = {"name": NAME, "version": VERSION, "date": DATE}
+
+# Smart column detection for mixed page layouts
+def segment_page_vertically(page, band_height=50):
+    """Divide page into horizontal bands for analysis"""
+    bands = []
+    all_words = page.extract_words()
+    
+    if not all_words:
+        return bands
+    
+    page_height = page.height
+    
+    for y_start in range(0, int(page_height), band_height):
+        y_end = min(y_start + band_height, page_height)
+        band_words = [w for w in all_words 
+                     if w['top'] >= y_start and w['top'] < y_end]
+        bands.append({
+            'y_start': y_start,
+            'y_end': y_end, 
+            'words': band_words
+        })
+    
+    return bands
+
+def analyze_band_structure(band):
+    """Determine if band has 1 or 2 columns"""
+    if not band['words']:
+        return 'empty'
+    
+    # Analyze word distribution
+    x_coords = [w['x0'] for w in band['words']]
+    min_x, max_x = min(x_coords), max(x_coords)
+    width = max_x - min_x
+    
+    # Check for centered content vs columns
+    left_zone = [w for w in band['words'] if w['x0'] < min_x + width * 0.3]
+    right_zone = [w for w in band['words'] if w['x0'] > min_x + width * 0.7]
+    middle_zone = [w for w in band['words'] if min_x + width * 0.3 <= w['x0'] <= min_x + width * 0.7]
+    
+    left_text = sum(len(w['text']) for w in left_zone)
+    right_text = sum(len(w['text']) for w in right_zone)
+    middle_text = sum(len(w['text']) for w in middle_zone)
+    total_text = left_text + right_text + middle_text
+    
+    if total_text == 0:
+        return 'empty'
+    
+    # Determine structure with very strict criteria
+    if middle_text > total_text * 0.7:
+        return 'single_centered'
+    elif left_text > total_text * 0.35 and right_text > total_text * 0.35:
+        # Additional check: ensure both columns have substantial content
+        min_column_size = min(left_text, right_text)
+        if min_column_size > total_text * 0.25:  # Both columns must be substantial (25%+ each)
+            return 'double_column'
+        else:
+            return 'single_column'
+    else:
+        return 'single_column'
+
+def group_similar_bands(bands):
+    """Group consecutive bands with same structure"""
+    if not bands:
+        return []
+    
+    segments = []
+    
+    # Analyze structure for each band
+    for band in bands:
+        band['structure'] = analyze_band_structure(band)
+    
+    # Group similar bands
+    current_segment = {
+        'structure': bands[0]['structure'],
+        'y_start': bands[0]['y_start'],
+        'y_end': bands[0]['y_end'],
+        'words': bands[0]['words']
+    }
+    
+    for band in bands[1:]:
+        if band['structure'] == current_segment['structure']:
+            # Extend current segment
+            current_segment['y_end'] = band['y_end']
+            current_segment['words'].extend(band['words'])
+        else:
+            # Start new segment
+            if current_segment['words']:  # Only add non-empty segments
+                segments.append(current_segment)
+            current_segment = {
+                'structure': band['structure'],
+                'y_start': band['y_start'],
+                'y_end': band['y_end'],
+                'words': band['words']
+            }
+    
+    if current_segment['words']:  # Add final segment
+        segments.append(current_segment)
+    
+    return segments
+
+def extract_text_from_mixed_segments(segments, has_hebrew, conf):
+    """Extract text using appropriate method for each segment"""
+    full_text = []
+    
+    for i, segment in enumerate(segments):
+        if segment['structure'] == 'empty' or not segment['words']:
+            continue
+        
+        if conf:
+            utils.tbox_log(f"Segment {i+1}: {segment['structure']} ({len(segment['words'])} words, Y:{segment['y_start']}-{segment['y_end']})", META, "INFO", conf)
+        
+        if segment['structure'] in ['single_column', 'single_centered']:
+            # Use single column extraction
+            text = extract_single_column_from_words(segment['words'], has_hebrew)
+        elif segment['structure'] == 'double_column':
+            # Use double column extraction
+            text = extract_double_column_from_words(segment['words'], has_hebrew)
+        
+        if text:
+            full_text.append(text)
+    
+    return '\n'.join(full_text)
+
+def extract_single_column_from_words(words, has_hebrew):
+    """Extract text from words as single column"""
+    if not words:
+        return ""
+    
+    # Sort by Y coordinate, then by X
+    words_sorted = sorted(words, key=lambda w: (w['top'], w['x0']))
+    
+    # Build lines
+    lines = []
+    current_line = []
+    current_y = None
+    
+    for word in words_sorted:
+        if current_y is None or abs(word['top'] - current_y) > 5:  # New line
+            if current_line:
+                lines.append(' '.join(current_line))
+            current_line = [word['text']]
+            current_y = word['top']
+        else:
+            current_line.append(word['text'])
+    
+    if current_line:
+        lines.append(' '.join(current_line))
+    
+    return '\n'.join(lines)
+
+def extract_double_column_from_words(words, has_hebrew):
+    """Extract text from words as double column"""
+    if not words:
+        return ""
+    
+    # Find column boundary
+    x_coords = [w['x0'] for w in words]
+    min_x, max_x = min(x_coords), max(x_coords)
+    mid_x = min_x + (max_x - min_x) / 2
+    
+    # Split into columns
+    left_column = [w for w in words if w['x0'] < mid_x]
+    right_column = [w for w in words if w['x0'] >= mid_x]
+    
+    # Sort each column
+    left_sorted = sorted(left_column, key=lambda w: (w['top'], w['x0']))
+    right_sorted = sorted(right_column, key=lambda w: (w['top'], w['x0']))
+    
+    # Extract text from each column
+    left_text = extract_single_column_from_words(left_sorted, has_hebrew)
+    right_text = extract_single_column_from_words(right_sorted, has_hebrew)
+    
+    # Combine based on reading direction
+    if has_hebrew:
+        # RTL: right column first, then left
+        combined = right_text + '\n' + left_text if left_text and right_text else right_text + left_text
+    else:
+        # LTR: left column first, then right
+        combined = left_text + '\n' + right_text if left_text and right_text else left_text + right_text
+    
+    return combined
 
 def extract_single_column_text(page, has_hebrew=False, conf=None):
     """Улучшенное извлечение текста для одноколоночных документов"""
@@ -76,6 +258,12 @@ def extract_columns_from_page(page, has_hebrew=False, conf=None):
                 utils.tbox_log("Обнаружено 1 колонка (узкая страница), используем улучшенное извлечение", META, "INFO", conf)
             return extract_single_column_text(page, has_hebrew, conf)
         
+        # Additional check: if page is not very wide, be conservative
+        if page_width < 450:
+            if conf:
+                utils.tbox_log(f"Page width {page_width:.0f}px - conservative: 1 column", META, "INFO", conf)
+            return extract_single_column_text(page, has_hebrew, conf)
+        
         # Анализируем распределение текста по горизонтали
         # Разделяем страницу на 3 вертикальные зоны
         left_zone = []
@@ -102,10 +290,22 @@ def extract_columns_from_page(page, has_hebrew=False, conf=None):
         
         total_text = left_text_len + right_text_len + middle_text_len
         
-        # Если большая часть текста в средней зоне или одна из боковых зон пуста - это одноколоночный документ
-        if middle_text_len > total_text * 0.6 or left_text_len < total_text * 0.1 or right_text_len < total_text * 0.1:
+        # Check for single column with centered headers
+        # If both side zones have similar amounts and middle zone is significant, 
+        # it's likely single column with centered content
+        side_balance = abs(left_text_len - right_text_len) / max(left_text_len, right_text_len) if max(left_text_len, right_text_len) > 0 else 0
+        
+        # Single column if:
+        # 1. Middle zone has significant text (centered headers)
+        # 2. Side zones are balanced (similar amounts)  
+        # 3. One side zone is very small
+        if middle_text_len > total_text * 0.3 and side_balance < 0.3:
             if conf:
-                utils.tbox_log(f"Обнаружено 1 колонку (текст в центре: {middle_text_len/total_text:.1%}), используем улучшенное извлечение", META, "INFO", conf)
+                utils.tbox_log(f"Detected 1 column with centered content (balance: {side_balance:.2f}, center: {middle_text_len/total_text:.1%})", META, "INFO", conf)
+            return extract_single_column_text(page, has_hebrew, conf)
+        elif left_text_len < total_text * 0.15 or right_text_len < total_text * 0.15:
+            if conf:
+                utils.tbox_log(f"Detected 1 column (unbalanced sides: left: {left_text_len/total_text:.1%}, right: {right_text_len/total_text:.1%})", META, "INFO", conf)
             return extract_single_column_text(page, has_hebrew, conf)
         
         # Если дошли сюда - у нас действительно две колонки
@@ -116,9 +316,9 @@ def extract_columns_from_page(page, has_hebrew=False, conf=None):
         # Если плотность текста очень неравномерная - вероятно одноколоночный документ
         if left_density > 0 and right_density > 0:
             density_ratio = min(left_density, right_density) / max(left_density, right_density)
-            if density_ratio < 0.3:  # Одна колонка имеет значительно меньше текста
+            if density_ratio < 0.4:  # One column has significantly less text
                 if conf:
-                    utils.tbox_log(f"Обнаружено 1 колонку (неравномерная плотность: {density_ratio:.2f}), используем улучшенное извлечение", META, "INFO", conf)
+                    utils.tbox_log(f"Detected 1 column (uneven density: {density_ratio:.2f}), using enhanced extraction", META, "INFO", conf)
                 return extract_single_column_text(page, has_hebrew, conf)
         
         # Разделяем на левую и правую колонки
@@ -132,12 +332,12 @@ def extract_columns_from_page(page, has_hebrew=False, conf=None):
             else:
                 right_column.append(word)
         
-        # Логируем обнаружение двух колонок и порядок чтения
+        # Логируем обнаружение двух колонок и порядок чтения с отладочной информацией
         if conf:
             if has_hebrew:
-                utils.tbox_log("Обнаружено 2 колонки, порядок: правая → левая (RTL)", META, "INFO", conf)
+                utils.tbox_log(f"Detected 2 columns, order: right -> left (RTL) | Width: {page_width:.0f}px | Left: {left_text_len/total_text:.1%} | Middle: {middle_text_len/total_text:.1%} | Right: {right_text_len/total_text:.1%}", META, "INFO", conf)
             else:
-                utils.tbox_log("Обнаружено 2 колонки, порядок: левая → правая (LTR)", META, "INFO", conf)
+                utils.tbox_log(f"Detected 2 columns, order: left -> right (LTR) | Width: {page_width:.0f}px | Left: {left_text_len/total_text:.1%} | Middle: {middle_text_len/total_text:.1%} | Right: {right_text_len/total_text:.1%}", META, "INFO", conf)
         
         # Проверяем, есть ли текст в обеих колонках
         if not left_column or not right_column:
@@ -254,8 +454,10 @@ def extract_pdf():
                 page_text_sample = page.extract_text() or ""
                 has_hebrew = bool(re.search(r'[\u0590-\u05FF]', page_text_sample))
                 
-                # Используем новый алгоритм извлечения колонок
-                txt = extract_columns_from_page(page, has_hebrew, CONF)
+                # Use new smart mixed layout detection
+                bands = segment_page_vertically(page)
+                segments = group_similar_bands(bands)
+                txt = extract_text_from_mixed_segments(segments, has_hebrew, CONF)
                 
                 if txt:
                     # Применяем bidi обработку для RTL текста

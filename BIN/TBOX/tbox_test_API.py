@@ -2,8 +2,9 @@ import os, sys, requests, configparser
 from tbox_utils import tbox_log
 
 # --- MANIFEST ---
-VERSION = "v2.00.git-structure"
-DATE    = "2026-04-14"
+# Previous: v1.4 (2026-01-23) - API testing version
+VERSION = "v1.5.api-check"
+DATE    = "2026-04-18"
 NAME    = os.path.basename(__file__)
 META    = {"name": NAME, "version": VERSION}
 

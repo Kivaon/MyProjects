@@ -38,9 +38,9 @@ except ImportError:
     OCR_AVAILABLE = False
     print("ВНИМАНИЕ: pytesseract или PIL не установлены. OCR не будет работать.")
 
-# --- ПАСПОРТ ---
-VERSION = "v1.0.ocr-aware"
-DATE    = "2026-02-12"
+# --- PASSPORT ---
+VERSION = "v1.1.ocr-stable"
+DATE    = "2026-04-18"
 NAME    = os.path.basename(__file__)
 META    = {"name": NAME, "version": VERSION, "date": DATE}
 

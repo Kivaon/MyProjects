@@ -22,15 +22,14 @@ try:
 except ImportError:
     AZURE_AVAILABLE = False
 
-# Попытка импорта универсального рефайнера
 try:
     import tbox_refine_standalone as refinery
 except ImportError:
     refinery = None
 
-# --- ПАСПОРТ ---
-VERSION = "v1.3.cloud-ready"
-DATE    = "2026-01-29"
+# --- PASSPORT ---
+VERSION = "v1.4.stable-cloud"
+DATE    = "2026-04-18"
 NAME    = os.path.basename(__file__)
 META    = {"name": NAME, "version": VERSION, "date": DATE}
 

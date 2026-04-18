@@ -5,8 +5,9 @@ from docx.shared import Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # --- MANIFEST ---
-VERSION = "v4.00.git-structure"
-DATE    = "2026-04-14"
+# Previous: v2.9.bidi (2026-01-25) - Enhanced BIDI support
+VERSION = "v3.0.enhanced-logging"
+DATE    = "2026-04-18"
 NAME    = os.path.basename(__file__)
 META    = {"name": NAME, "version": VERSION}
 

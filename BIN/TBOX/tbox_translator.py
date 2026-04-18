@@ -6,11 +6,10 @@ from docx.shared import Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from tbox_utils import tbox_log
 
-
-
 # --- MANIFEST ---
-VERSION = "v7.00.git-structure"
-DATE    = "2026-04-14"
+# Previous: v6.00.hybrid_pro (2026-01-27) - Hybrid version with smart chunking
+VERSION = "v6.10.smart-chunking"
+DATE    = "2026-04-18"
 NAME    = os.path.basename(__file__)
 META    = {"name": NAME, "version": VERSION}
 
@@ -105,82 +104,53 @@ def find_working_model(api_key, conf):
             continue
     return None
 
+# Smart chunking functions
 def minimal_smart_chunking(text, max_chars=10000, buffer_size=150):
-    """
-    Минимальный умный алгоритм:
-    1. Берем большой чанк max_chars
-    2. Берем граничный чанк-буфер buffer_size
-    3. Ищем по порядку: .!? → ,:;- → пробел
-    4. Режем по найденной позиции
-    """
     chunks = []
     pos = 0
     
     while pos < len(text):
-        # Шаг 1: Берем большой чанк max_chars
         chunk_end = min(pos + max_chars, len(text))
-        
-        # Если не последний чанк, ищем умную границу
         if chunk_end < len(text):
-            # Шаг 2: Берем граничный чанк-буфер
             boundary = find_boundary_minimal(text, pos, chunk_end, buffer_size, max_chars)
             if boundary:
                 chunk_end = boundary
         
-        # Извлекаем чанк
         chunk_text = text[pos:chunk_end]
-        
         if chunk_text.strip():
             chunks.append(chunk_text)
-        
-        # Двигаемся к следующей границе
         pos = chunk_end
     
     return chunks
 
 def find_boundary_minimal(text, start_pos, end_pos, buffer_size, max_chars):
-    """
-    Ищем границу по минимальной логике:
-    а) .!?
-    б) ,:;-
-    в) пробел
-    """
-    # Шаг 2: Берем граничный чанк-буфер (последние buffer_size символов)
     buffer_start = max(start_pos, end_pos - buffer_size)
-    buffer_end = end_pos
-    buffer_text = text[buffer_start:buffer_end]
+    boundary_text = text[buffer_start:end_pos]
     
-    # а) Ищем первую точку/воскл/вопрос (.!?)
-    for i, char in enumerate(buffer_text):
-        actual_pos = buffer_start + i
+    for i, char in enumerate(reversed(boundary_text)):
+        actual_pos = buffer_start + len(boundary_text) - 1 - i
         if char in '.!?':
-            # Проверяем минимальный размер чанка
             chunk_size = (actual_pos + 1) - start_pos
             min_size = max_chars * 0.3
             if chunk_size >= min_size:
-                return actual_pos + 1  # Режем после знака
+                return actual_pos + 1
     
-    # б) Если нет .!? - ищем запятую/тире/двоеточие (,:;-)
-    for i, char in enumerate(buffer_text):
-        actual_pos = buffer_start + i
-        if char in ',;:—-':
-            # Проверяем минимальный размер чанка
+    for i, char in enumerate(reversed(boundary_text)):
+        actual_pos = buffer_start + len(boundary_text) - 1 - i
+        if char in ',;:--':
             chunk_size = actual_pos - start_pos
             min_size = max_chars * 0.3
             if chunk_size >= min_size:
                 return actual_pos
     
-    # в) Если нет ,:;- - ищем пробел
-    for i, char in enumerate(buffer_text):
-        actual_pos = buffer_start + i
+    for i, char in enumerate(reversed(boundary_text)):
+        actual_pos = buffer_start + len(boundary_text) - 1 - i
         if char == ' ':
-            # Проверяем минимальный размер чанка
             chunk_size = actual_pos - start_pos
             min_size = max_chars * 0.3
             if chunk_size >= min_size:
                 return actual_pos
     
-    # Если ничего не найдено - жесткий разрез
     return end_pos
 
 def translate_md_chunk(chunk, part_num, total_parts, author, conf, prompts, prompt_code, include_original):
@@ -206,19 +176,20 @@ def translate_md_chunk(chunk, part_num, total_parts, author, conf, prompts, prom
     while True:
         # Маркер начала чанка с текущей моделью
         header_marker = f"\n\n--- [PART {part_num}/{total_parts} | MODEL: {CURRENT_MODEL}] ---\n"
-
+        
         # 3 попытки для текущей модели
         for attempt in range(3):
             try:
                 api_ver = get_api_ver(CURRENT_MODEL)
                 url = f"https://generativelanguage.googleapis.com/{api_ver}/models/{CURRENT_MODEL}:generateContent?key={api_key}"
                 
-                tbox_log(f"🔄 Перевод части {part_num}/{total_parts}...Попытка {attempt+1}/3 ({CURRENT_MODEL})", META, "INFO", conf) 
+                tbox_log(f"Попытка {attempt+1}/3: {CURRENT_MODEL}", META, "INFO", conf)
+                
                 r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=120)
                 
                 if r.status_code == 200:
                     content = r.json()['candidates'][0]['content']['parts'][0]['text']
-                    tbox_log(f"✅ Часть {part_num}/{total_parts} ", META, "INFO", conf)
+                    tbox_log(f"Успех: часть {part_num}/{total_parts}", META, "INFO", conf)
                     return header_marker + content
                 
                 # Дифференцированная обработка ошибок
@@ -301,7 +272,6 @@ def main():
     parser.add_argument('-md', action='store_true', help='Использовать последний md из MD_DIR')
     parser.add_argument('-s', action='store_true', help='Включать оригинал цитат')
     parser.add_argument('-p', '--prompt', type=str, help='Код промпта (TORAH, FICTION, GENERIC)', dest='prompt')
-    parser.add_argument('-GPT', action='store_true', help='Use GPT model instead of Gemini')
     args = parser.parse_args()
     
     CONF = load_tbox_config()
@@ -365,7 +335,7 @@ def main():
     with open(target, 'r', encoding='utf-8') as f:
         full_text = f.read()
 
-    # Делим на чанки с умным алгоритмом
+    # Smart chunking
     chunks = minimal_smart_chunking(full_text, max_chars=10000, buffer_size=150)
     
     doc = Document()
@@ -376,7 +346,7 @@ def main():
     doc.add_heading(f"Перевод лекции: {author}", 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     for i, chunk in enumerate(chunks, 1):
-        #tbox_log(f"Перевод чанка {i}/{len(chunks)}...", META, "INFO", CONF)
+        tbox_log(f"Перевод чанка {i}/{len(chunks)}...", META, "INFO", CONF)
         translated_md = translate_md_chunk(chunk, i, len(chunks), author, CONF, PROMPTS, prompt_code, args.s)
         render_md_to_docx(translated_md, doc)
         if i < len(chunks):

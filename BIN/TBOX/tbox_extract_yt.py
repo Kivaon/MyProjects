@@ -19,8 +19,9 @@ except ImportError as e:
     sys.exit(1)
 
 # --- MANIFEST ---
-VERSION = "v4.4.final"
-DATE    = "2026-01-25"
+# Previous: v4.4.final (2026-01-25) - Final stable version
+VERSION = "v4.5.stable-args"
+DATE    = "2026-04-18"
 NAME    = os.path.basename(__file__)
 META    = {"name": NAME, "version": VERSION}
 

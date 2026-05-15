@@ -7,13 +7,6 @@ import re
 import pdfplumber
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
-import tbox_utils as utils
-
-# Импортируем наш универсальный Refinery
-try:
-    import tbox_refine_standalone as refinery
-except ImportError:
-    refinery = None
 
 # Конфигурация директорий вывода
 OUTPUT_CONFIG = {
@@ -30,10 +23,10 @@ from dataclasses import dataclass
 from collections import defaultdict
 
 # --- ПАСПОРТ ---
-VERSION = "v3.30.release"
-DATE    = "2026-05-11"
-NAME = os.path.basename(__file__)
-META = {"name": NAME, "version": VERSION, "date": DATE}
+VERSION = "v3.29.final-corrected"
+DATE    = "2026-05-08"
+NAME    = os.path.basename(__file__)
+META    = {"name": NAME, "version": VERSION, "date": DATE}
 
 # Конфигурация языков с направлениями текста
 LANGUAGE_CONFIGS = {
@@ -413,12 +406,7 @@ class FinalCorrectedAnalyzer:
         # ШАГ 1: Извлекаем слова из PDF
         raw_words = page.extract_words()
         print(f"  📊 Извлечено слов: {len(raw_words)}")
-
-        # Обработка пустых страниц
-        if len(raw_words) == 0:
-            print(f"  ⚠️ Страница {page_num} пуста - пропускаем")
-            return f"[Страница {page_num}: пустая]"
-
+        
         print("\n" + "="*60)
         print("ШАГ 2: ОПРЕДЕЛЕНИЕ ЯЗЫКА")
         print("="*60)
@@ -720,10 +708,10 @@ class FinalCorrectedAnalyzer:
             else:
                 gap = next_word.x0 - current_word.x1
             
-            # Увеличиваем порог для знаков препинания - они должны объединяться с соседними словами
+            # Уменьшаем порог для знаков препинания
             effective_threshold = adaptive_gap_threshold
             if is_punctuation(next_word.original_text) or is_punctuation(current_word.original_text):
-                effective_threshold = adaptive_gap_threshold * 1.5
+                effective_threshold = adaptive_gap_threshold * 0.5
             
             if gap > effective_threshold:
                 lines.append(current_line)
@@ -814,10 +802,10 @@ class FinalCorrectedAnalyzer:
             else:
                 gap = next_word.x0 - current_word.x1
             
-            # Увеличиваем порог для знаков препинания - они должны объединяться с соседними словами
+            # Уменьшаем порог для знаков препинания
             effective_threshold = adaptive_gap_threshold
             if is_punctuation(next_word.original_text) or is_punctuation(current_word.original_text):
-                effective_threshold = adaptive_gap_threshold * 1.5
+                effective_threshold = adaptive_gap_threshold * 0.5
             
             if gap > effective_threshold:
                 lines.append(current_line)
@@ -1755,74 +1743,20 @@ class FinalCorrectedAnalyzer:
         return "\n".join(page_text)
 
 def main():
-    """Основная функция с интеграцией конфига и умным поиском файлов"""
-    # 1. Загрузка конфигурации
-    CONF = utils.load_local_config()
-    if not CONF:
-        utils.tbox_log("Критическая ошибка: Конфиг не найден.", META, "ERROR", CONF)
-        return
-
-    # Получаем директории из конфига или используем дефолтные
-    INBOX_DIR = CONF.get('INBOX_DIR', '/Users/kivaonmac/Documents/AI_Lab/01_INBOX')
-    RAW_DIR = CONF.get('TXT_RAW', OUTPUT_CONFIG['txt_raw'])
-
-    # 2. Логика поиска файла
-    user_arg = sys.argv[1] if len(sys.argv) > 1 else None
-    target_path = None
-
-    if user_arg:
-        if os.path.exists(user_arg):
-            target_path = os.path.abspath(user_arg)
-        else:
-            # Умный поиск по частичному совпадению имени
-            files = [f for f in os.listdir(INBOX_DIR) if f.lower().endswith('.pdf')]
-            matches = [f for f in files if user_arg.lower() in f.lower()]
-            if matches:
-                full_matches = [os.path.join(INBOX_DIR, f) for f in matches]
-                target_path = max(full_matches, key=os.path.getmtime)
-    else:
-        # Автоматический выбор последнего файла
-        files = [os.path.join(INBOX_DIR, f) for f in os.listdir(INBOX_DIR) if f.lower().endswith('.pdf')]
-        if files:
-            target_path = max(files, key=os.path.getmtime)
-
-    if not target_path:
-        utils.tbox_log("Целевой файл не определен.", META, "ERROR", CONF)
-        print("Использование: python tbox_extract_pdf.py <pdf_file>")
+    """Основная функция"""
+    if len(sys.argv) < 2:
+        print("Использование: python tbox_final_corrected.py <pdf_file>")
         sys.exit(1)
-
-    utils.tbox_log(f"Обработка файла: {os.path.basename(target_path)}", META, "START", CONF)
-
-    # 3. Анализ PDF
-    analyzer = FinalCorrectedAnalyzer(debug_mode=False)
-    success = analyzer.analyze_page_with_final_corrected(target_path)
-
+    
+    pdf_path = sys.argv[1]
+    
+    analyzer = FinalCorrectedAnalyzer(debug_mode=True)
+    success = analyzer.analyze_page_with_final_corrected(pdf_path)
+    
     if success:
-        utils.tbox_log(f"✅ Анализ завершен успешно", META, "DONE", CONF)
-
-        # 4. Интеграция с Refinery
-        if refinery:
-            # Находим последний созданный файл в RAW_DIR
-            txt_files = [os.path.join(RAW_DIR, f) for f in os.listdir(RAW_DIR) if f.endswith('_raw.txt')]
-            if txt_files:
-                last_txt = max(txt_files, key=os.path.getmtime)
-                utils.tbox_log(f"Передача в Refinery: {os.path.basename(last_txt)}", META, "INFO", CONF)
-
-                # Определяем режим на основе наличия RTL текста
-                # Проверяем есть ли иврит в тексте
-                try:
-                    with open(last_txt, 'r', encoding='utf-8') as f:
-                        content = f.read(1000)  # Проверяем первые 1000 символов
-                        is_hebrew = bool(re.search(r'[\u0590-\u05FF]', content))
-                        mode = "PDF_HE" if is_hebrew else "PDF"
-                        refinery.run_refining(last_txt, mode=mode)
-                        utils.tbox_log(f"Refinery завершен (режим: {mode})", META, "DONE", CONF)
-                except Exception as e:
-                    utils.tbox_log(f"Ошибка Refinery: {e}", META, "WARNING", CONF)
-        else:
-            utils.tbox_log("Refinery не найден, автоматическая верстка пропущена.", META, "WARNING", CONF)
+        print(f"\n✅ Анализ с финальными исправлениями завершен успешно")
     else:
-        utils.tbox_log(f"❌ Анализ завершен с ошибками", META, "ERROR", CONF)
+        print(f"\n❌ Анализ завершен с ошибками")
         sys.exit(1)
 
 if __name__ == "__main__":

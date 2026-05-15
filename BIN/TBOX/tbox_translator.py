@@ -1788,6 +1788,32 @@ def main():
     # Выводим итоговую статистику по GPT токенам
     if use_gpt:
         print_gpt_token_stats(CONF)
+    
+    # Предлагаем открыть результирующий файл
+    print(f"\n📂 Открыть результирующий файл?")
+    response = input("Открыть файл? (Да/Yes/1/Нет/No/0): ").strip().lower()
+    
+    if response in ['да', 'yes', 'y', '1']:
+        try:
+            import subprocess
+            import platform
+            
+            system = platform.system()
+            if system == 'Darwin':  # macOS
+                subprocess.run(['open', res_path])
+            elif system == 'Windows':
+                subprocess.run(['start', res_path], shell=True)
+            elif system == 'Linux':
+                subprocess.run(['xdg-open', res_path])
+            else:
+                print(f"❓ Неизвестная система: {system}")
+                return
+                
+            print(f"✅ Файл открыт: {os.path.basename(res_path)}")
+        except Exception as e:
+            print(f"❌ Ошибка открытия файла: {e}")
+    else:
+        print(f"📁 Файл сохранен: {os.path.basename(res_path)}")
 
 if __name__ == "__main__":
     main()

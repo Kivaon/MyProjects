@@ -1,39 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import sys
-import os
-import re
-import pdfplumber
+import os, sys, re, pdfplumber
 from datetime import datetime
-from typing import List, Dict, Tuple, Optional
-import tbox_utils as utils
-
-# Импортируем наш универсальный Refinery
-try:
-    import tbox_refine_standalone as refinery
-except ImportError:
-    refinery = None
-
-# Конфигурация директорий вывода
-OUTPUT_CONFIG = {
-    'debug_dir': "/Users/kivaonmac/Documents/AI_Lab/02_TXT/debug",
-    'txt_raw': "/Users/kivaonmac/Documents/AI_Lab/02_TXT/txt_raw",
-    'md_dir': "/Users/kivaonmac/Documents/AI_Lab/02_TXT/md"
-}
-
-# Создаем директории если они не существуют
-for dir_path in OUTPUT_CONFIG.values():
-    os.makedirs(dir_path, exist_ok=True)
-
+from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 from collections import defaultdict
 
 # --- ПАСПОРТ ---
-VERSION = "v3.30.release"
-DATE    = "2026-05-11"
-NAME = os.path.basename(__file__)
-META = {"name": NAME, "version": VERSION, "date": DATE}
+VERSION = "v3.29.final-corrected"
+DATE    = "2026-05-08"
+NAME    = os.path.basename(__file__)
+META    = {"name": NAME, "version": VERSION, "date": DATE}
 
 # Конфигурация языков с направлениями текста
 LANGUAGE_CONFIGS = {
@@ -108,38 +86,6 @@ def add_rtl_mark_for_punctuation(text: str, is_rtl: bool = True) -> str:
         i += 1
     
     return ''.join(result)
-
-def _detect_word_language(self, word_text: str) -> str:
-    """Определяет направление отдельного слова с поддержкой множества языков"""
-    # Иврит
-    if re.search(r'[\u0590-\u05FF]', word_text):
-        return 'rtl'
-    # Арабский
-    elif re.search(r'[\u0600-\u06FF]', word_text):
-        return 'rtl'
-    # Латиница, цифры, email, телефон, URL
-    elif re.match(r'^[\d\w\.\-\+\/@\:]+$', word_text):
-        return 'ltr'
-    else:
-        return 'unknown'  # Неопределенный язык
-
-def _reverse_single_word(self, text: str) -> str:
-    """Переворачивает буквы в одном слове с сохранением никуда"""
-    groups = []
-    i = 0
-    while i < len(text):
-        char = text[i]
-        if '\u05D0' <= char <= '\u05EA':
-            group = char
-            i += 1
-            while i < len(text) and '\u0590' <= text[i] <= '\u05CF':
-                group += str(text[i])
-                i += 1
-            groups.append(group)
-        else:
-            groups.append(char)
-            i += 1
-    return ''.join(groups[::-1])
 
 def has_nikud_in_text(words: List[Dict]) -> bool:
     """Проверяет, есть ли никуд в тексте"""
@@ -253,7 +199,7 @@ def merge_nikud_with_neighbors(words: List, is_rtl: bool = True) -> List:
             if left_word and i-1 not in skip_indices:
                 # Для RTL: конец левого слова должен быть близок к началу текущего
                 distance_left = abs(left_word.x0 - word.x1)
-                print(f"        📏 Расстояние до левого: {distance_left:.1f} pt")
+                print(f"        📏 Расстояние до левого: {distance_left:.1f} пикселей")
                 
                 if distance_left <= merge_threshold:
                     print(f"        ✅ Объединяем с левым: '{left_word.text}'")
@@ -319,39 +265,6 @@ class FinalCorrectedAnalyzer:
     def __init__(self, debug_mode: bool = True):
         self.debug_mode = debug_mode
         self.language_info = None
-        self.global_block_counter = 0  # Глобальный счетчик блоков для сквозной нумерации
-
-    def _detect_word_language(self, word_text: str) -> str:
-        """Определяет направление отдельного слова с поддержкой множества языков"""
-        # Иврит
-        if re.search(r'[\u0590-\u05FF]', word_text):
-            return 'rtl'
-        # Арабский
-        elif re.search(r'[\u0600-\u06FF]', word_text):
-            return 'rtl'
-        # Латиница, цифры, email, телефон, URL
-        elif re.match(r'^[\d\w\.\-\+\/@\:]+$', word_text):
-            return 'ltr'
-        else:
-            return 'unknown'  # Неопределенный язык
-
-    def _reverse_single_word(self, text: str) -> str:
-        """Переворачивает буквы в одном слове с сохранением никуда"""
-        groups = []
-        i = 0
-        while i < len(text):
-            char = text[i]
-            if '\u05D0' <= char <= '\u05EA':
-                group = char
-                i += 1
-                while i < len(text) and '\u0590' <= text[i] <= '\u05CF':
-                    group += str(text[i])
-                    i += 1
-                groups.append(group)
-            else:
-                groups.append(char)
-                i += 1
-        return ''.join(groups[::-1])
     
     def analyze_page_with_final_corrected(self, pdf_path: str) -> bool:
         """Основной метод анализа с финальными исправлениями"""
@@ -362,49 +275,32 @@ class FinalCorrectedAnalyzer:
                 # Анализируем все страницы
                 all_page_text = []
                 timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
-                debug_dir = OUTPUT_CONFIG['debug_dir']
-                
-                # Формируем имя файла из оригинального PDF
-                original_name = os.path.basename(pdf_path)
-                clean_base_name = original_name.replace('.pdf', '').replace('.PDF', '')
+                debug_dir = "/Users/kivaonmac/Documents/AI_Lab/02_TXT/debug"
+                os.makedirs(debug_dir, exist_ok=True)
 
                 for page_num, page in enumerate(pdf.pages, 1):
                     print(f"\n{'='*60}")
                     print(f"СТРАНИЦА {page_num}/{len(pdf.pages)}")
                     print('='*60)
-                    page_text = self._analyze_page_with_final_corrected(page, page_num, timestamp, debug_dir, clean_base_name)
+                    page_text = self._analyze_page_with_final_corrected(page, page_num, timestamp, debug_dir)
                     all_page_text.append(page_text)
 
-                # Сохраняем общий текст всех страниц (TXT и MD)
-                full_text_file = os.path.join(OUTPUT_CONFIG['txt_raw'], f"{timestamp}_{clean_base_name}_raw.txt")
-                full_md_file = os.path.join(OUTPUT_CONFIG['md_dir'], f"{timestamp}_{clean_base_name}.md")
-                
-                # TXT формат
+                # Сохраняем общий текст всех страниц
+                full_text_file = os.path.join(debug_dir, f"{timestamp}_full_text.txt")
                 with open(full_text_file, 'w', encoding='utf-8') as f:
                     f.write("ПОЛНЫЙ ТЕКСТ ВСЕХ СТРАНИЦ\n")
                     f.write("="*80 + "\n\n")
                     for page_text in all_page_text:
                         f.write(page_text + "\n\n")
-                
-                # MD формат
-                with open(full_md_file, 'w', encoding='utf-8') as f:
-                    f.write("# ПОЛНЫЙ ТЕКСТ ВСЕХ СТРАНИЦ\n\n")
-                    for page_num, page_text in enumerate(all_page_text, 1):
-                        f.write(f"## СТРАНИЦА {page_num}\n\n")
-                        f.write("```\n")
-                        f.write(page_text)
-                        f.write("\n```\n\n")
 
-                print(f"\n  💾 Полный текст сохранен:")
-                print(f"     📄 TXT: {full_text_file}")
-                print(f"     📄 MD: {full_md_file}")
+                print(f"\n  💾 Полный текст сохранен: {full_text_file}")
                 return True
 
         except Exception as e:
             print(f"❌ Ошибка анализа PDF: {e}")
             return False
     
-    def _analyze_page_with_final_corrected(self, page, page_num: int, timestamp: str, debug_dir: str, clean_base_name: str) -> str:
+    def _analyze_page_with_final_corrected(self, page, page_num: int, timestamp: str, debug_dir: str) -> str:
         """Анализ страницы с финальными исправлениями, возвращает текст страницы"""
         print("\n" + "="*60)
         print("ШАГ 1: ИЗВЛЕЧЕНИЕ СЛОВ ИЗ PDF")
@@ -413,12 +309,7 @@ class FinalCorrectedAnalyzer:
         # ШАГ 1: Извлекаем слова из PDF
         raw_words = page.extract_words()
         print(f"  📊 Извлечено слов: {len(raw_words)}")
-
-        # Обработка пустых страниц
-        if len(raw_words) == 0:
-            print(f"  ⚠️ Страница {page_num} пуста - пропускаем")
-            return f"[Страница {page_num}: пустая]"
-
+        
         print("\n" + "="*60)
         print("ШАГ 2: ОПРЕДЕЛЕНИЕ ЯЗЫКА")
         print("="*60)
@@ -449,7 +340,7 @@ class FinalCorrectedAnalyzer:
             
             print(f"  📊 Всего найдено слов с огласовками: {len(nikud_words_before)}")
             
-            #raw_words = reverse_rtl_words(raw_words)
+            raw_words = reverse_rtl_words(raw_words)
             
             # ДЕБАГ: Таблица сравнения ДО и ПОСЛЕ переворота с кодами
             print(f"  🔍 ДЕБАГ: Таблица сравнения ДО и ПОСЛЕ переворота:")
@@ -505,8 +396,8 @@ class FinalCorrectedAnalyzer:
         print("="*60)
         
         # ШАГ 4: Создаем группы по Y координатам
-        y_groups = self._create_y_groups(raw_words, use_bottom=True)
-        print(f"  📋 Создано групп по Y (bottom): {len(y_groups)}")
+        y_groups = self._create_y_groups(raw_words)
+        print(f"  📋 Создано групп по Y: {len(y_groups)}")
         
         print("\n" + "="*60)
         print("ШАГ 5: ФОРМИРОВАНИЕ СТРОК")
@@ -552,97 +443,54 @@ class FinalCorrectedAnalyzer:
         print("="*60)
         
         # ШАГ 9: Статистика и сохранение
-        page_text = self._analyze_and_save_results(processed_groups, timestamp, debug_dir, page_num, clean_base_name)
+        self._analyze_and_save_results(processed_groups, timestamp, debug_dir, page_num)
         
-        return page_text
+        return True
     
     def _detect_language(self, word_texts: List[str]) -> Dict:
-        """Определяет язык текста с учетом смешанных языков"""
-        language_counts = {}
-        for text in word_texts:
-            word_lang = self._detect_word_language(text)
-            language_counts[word_lang] = language_counts.get(word_lang, 0) + 1
+        """Определяет язык документа"""
+        if not word_texts:
+            return {'language': 'unknown', 'direction': 'ltr', 'confidence': 0.0}
         
-        # Определяем основной язык
-        if language_counts.get('rtl', 0) > language_counts.get('ltr', 0):
-            best_language = 'hebrew'  # Преимущество RTL при равенстве
-        elif language_counts.get('ltr', 0) > language_counts.get('rtl', 0):
-            best_language = 'english'
-        else:
-            # Равное количество - выбираем по другим критериям
-            best_language = self.language_info.get('language', 'english')
+        # Считаем слова для каждого языка (без учета знаков препинания и никуда)
+        language_scores = {}
         
-        lang_config = LANGUAGE_CONFIGS.get(best_language, LANGUAGE_CONFIGS['english'])
+        for lang_name, lang_config in LANGUAGE_CONFIGS.items():
+            pattern = lang_config['pattern']
+            clean_words = [re.sub(PUNCTUATION_PATTERNS['universal'] + '|' + NIKUD_PATTERN, '', w) for w in word_texts]
+            count = sum(1 for word in clean_words if re.search(pattern, word))
+            language_scores[lang_name] = count
         
+        if not language_scores:
+            return {'language': 'unknown', 'direction': 'ltr', 'confidence': 0.0}
+        
+        # Находим язык с максимальным счетом
+        best_language = max(language_scores.items(), key=lambda x: x[1])
+        lang_name, confidence = best_language
+        
+        lang_config = LANGUAGE_CONFIGS[lang_name]
         return {
-            'language': best_language,
+            'language': lang_name,
             'direction': lang_config['direction'],
-            'confidence': max(language_counts.values()),
+            'confidence': confidence,
             'typical_font_size': lang_config.get('typical_font_size', 12.0)
         }
     
-    def _create_y_groups(self, words: List[Dict], use_bottom: bool = False) -> List[Dict]:
-        """Создает группы слов по Y координатам с поддержкой смешанных языков"""
+    def _create_y_groups(self, words: List[Dict]) -> List[Dict]:
+        """Создает группы слов по Y координатам"""
         if not words:
             return []
         
-        print(f"  🔍 _create_y_groups вызван с {len(words)} слов, use_bottom={use_bottom}")
-        
-        # Обрабатываем каждое слово - проверяем язык и переворачиваем если нужно
-        processed_words = []
-        reversed_count = 0
-        kept_count = 0
-        rtl_count = 0
-        ltr_count = 0
-        unknown_count = 0
-        
-        for word in words:
-            processed_word = word.copy()
-            word_language = self._detect_word_language(word['text'])
-            
-            # Определяем направление для слова
-            if word_language == 'rtl':
-                rtl_count += 1
-                # RTL слова всегда переворачиваем
-                original_text = word['text']
-                processed_word['text'] = self._reverse_single_word(word['text'])
-                if original_text != processed_word['text']:
-                    reversed_count += 1
-                    print(f"  🔄 RTL переворот: '{original_text}' → '{processed_word['text']}'")
-            elif word_language == 'ltr':
-                ltr_count += 1
-                # LTR слова оставляем как есть
-                processed_word['text'] = word['text']
-                kept_count += 1
-            else:
-                unknown_count += 1
-                # Неопределенные слова - по направлению документа
-                if self.language_info['direction'] == 'rtl':
-                    original_text = word['text']
-                    processed_word['text'] = self._reverse_single_word(word['text'])
-                    if original_text != processed_word['text']:
-                        reversed_count += 1
-                        print(f"  🔄 UNKNOWN переворот (RTL doc): '{original_text}' → '{processed_word['text']}'")
-                else:
-                    processed_word['text'] = word['text']
-                    kept_count += 1
-            
-            processed_words.append(processed_word)
-        
-        print(f"  📊 Статистика языков: RTL={rtl_count}, LTR={ltr_count}, UNKNOWN={unknown_count}")
-        print(f"  📊 Статистика переворота: {reversed_count} слов переворачено, {kept_count} слов оставлено")
-        
-        # Сортируем слова по Y (top или bottom), затем по X
-        y_key = 'bottom' if use_bottom else 'top'
-        sorted_words = sorted(processed_words, key=lambda w: (w[y_key], w['x0']))
+        # Сортируем слова по Y, затем по X
+        sorted_words = sorted(words, key=lambda w: (w['top'], w['x0']))
         
         groups = []
         current_group_words = []
         current_y = None
-        y_tolerance = 5
+        y_tolerance = 3.0
         
         for word in sorted_words:
-            word_y = word.get('bottom', word['top']) if use_bottom else word['top']
+            word_y = word['top']
             
             if current_y is None:
                 current_y = word_y
@@ -651,22 +499,19 @@ class FinalCorrectedAnalyzer:
                 current_group_words.append(word)
             else:
                 if current_group_words:
-                    y_center = sum(w.get('bottom', w['top']) if use_bottom else w['top'] for w in current_group_words) / len(current_group_words)
                     groups.append({
                         'words': current_group_words,
-                        'y_center': y_center
+                        'y_center': sum(w['top'] for w in current_group_words) / len(current_group_words)
                     })
                 current_group_words = [word]
                 current_y = word_y
         
         if current_group_words:
-            y_center = sum(w.get('bottom', w['top']) if use_bottom else w['top'] for w in current_group_words) / len(current_group_words)
             groups.append({
                 'words': current_group_words,
-                'y_center': y_center
+                'y_center': sum(w['top'] for w in current_group_words) / len(current_group_words)
             })
         
-        print(f"  📋 Создано групп по Y ({y_key}): {len(groups)}")
         return groups
     
     def _create_y_group_with_nikud_merge(self, group: Dict) -> YGroup:
@@ -720,10 +565,10 @@ class FinalCorrectedAnalyzer:
             else:
                 gap = next_word.x0 - current_word.x1
             
-            # Увеличиваем порог для знаков препинания - они должны объединяться с соседними словами
+            # Уменьшаем порог для знаков препинания
             effective_threshold = adaptive_gap_threshold
             if is_punctuation(next_word.original_text) or is_punctuation(current_word.original_text):
-                effective_threshold = adaptive_gap_threshold * 1.5
+                effective_threshold = adaptive_gap_threshold * 0.5
             
             if gap > effective_threshold:
                 lines.append(current_line)
@@ -814,10 +659,10 @@ class FinalCorrectedAnalyzer:
             else:
                 gap = next_word.x0 - current_word.x1
             
-            # Увеличиваем порог для знаков препинания - они должны объединяться с соседними словами
+            # Уменьшаем порог для знаков препинания
             effective_threshold = adaptive_gap_threshold
             if is_punctuation(next_word.original_text) or is_punctuation(current_word.original_text):
-                effective_threshold = adaptive_gap_threshold * 1.5
+                effective_threshold = adaptive_gap_threshold * 0.5
             
             if gap > effective_threshold:
                 lines.append(current_line)
@@ -995,7 +840,7 @@ class FinalCorrectedAnalyzer:
             if is_punctuation(char):
                 # Если это последний знак препинания в строке
                 if i == len(chars) - 1:
-                    result.append('\u200F' + char)  # Вариант 1
+                    result.append(char + '\u200F')  # Вариант 1
                 else:
                     result.append(char)
             else:
@@ -1017,7 +862,7 @@ class FinalCorrectedAnalyzer:
             for i, word in enumerate(sorted_words):
                 if word.is_punctuation and i > 0 and text_parts and isinstance(text_parts[-1], str):
                     if i == len(sorted_words) - 1:
-                        text_parts[-1] += '\u200F' + str(word.text)
+                        text_parts[-1] += str(word.text) + '\u200F'
                     else:
                         text_parts[-1] += str(word.text)
                 else:
@@ -1029,7 +874,7 @@ class FinalCorrectedAnalyzer:
             sorted_words = sorted(words, key=lambda w: w.x0)
             return ' '.join(w.text for w in sorted_words)
     
-    def _analyze_and_save_results(self, y_groups: List[YGroup], timestamp: str, debug_dir: str, page_num: int, clean_base_name: str):
+    def _analyze_and_save_results(self, y_groups: List[YGroup], timestamp: str, debug_dir: str, page_num: int):
         """Анализирует и сохраняет результаты"""
         print(f"  📊 Анализ {len(y_groups)} групп:")
         
@@ -1065,7 +910,7 @@ class FinalCorrectedAnalyzer:
         
         print(f"\n  📈 СТАТИСТИКА X ПОЗИЦИЙ:")
         print(f"    Всего уникальных X позиций: {len(sorted_x_positions)}")
-        print(f"    Адаптивный порог разрыва: 14.0 pt")
+        print(f"    Адаптивный порог разрыва: 14.0 пикселей")
         print(f"    Объединение никуда: встроено в формирование строк")
         
         print(f"\n    ТОП-10 X позиций по частоте:")
@@ -1080,7 +925,7 @@ class FinalCorrectedAnalyzer:
             f.write("="*60 + "\n\n")
             f.write(f"Основной язык: {self.language_info['language']}\n")
             f.write(f"Направление: {self.language_info['direction'].upper()}\n")
-            f.write(f"Адаптивный порог разрыва: 14.0 pt\n")
+            f.write(f"Адаптивный порог разрыва: 14.0 пикселей\n")
             f.write(f"Объединение никуда: встроено в формирование строк\n")
             f.write(f"Всего групп: {len(y_groups)}\n\n")
             
@@ -1097,7 +942,7 @@ class FinalCorrectedAnalyzer:
                 f.write(f"  X позиции: {[f'{x:.1f}' for x in group.x_positions]}\n")
                 f.write(f"  Строки ({len(group.lines)}):\n")
                 for line in group.lines:
-                    f.write(f"    Строка {line.line_number}: X={line.x0:.1f}-{line.x1:.1f}, ширина={line.width:.1f}, шрифт={line.avg_font_size:.1f}pt\n")
+                    f.write(f"    Строка {line.line_number}: X={line.x0:.1f}-{line.x1:.1f}, ширина={line.width:.1f}, шрифт={line.avg_font_size:.1f}px\n")
                     f.write(f"    Текст: {line.text}\n")
                 f.write("\n" + "-"*50 + "\n\n")
         
@@ -1114,7 +959,7 @@ class FinalCorrectedAnalyzer:
         self._scan_y_coordinates(y_groups, timestamp, debug_dir, page_num)
         
         # Создаем вертикальные блоки из строк
-        return self._create_vertical_blocks(y_groups, timestamp, debug_dir, page_num, clean_base_name)
+        return self._create_vertical_blocks(y_groups, timestamp, debug_dir, page_num)
     
     def _save_sorted_lines_table(self, y_groups: List[YGroup], timestamp: str, debug_dir: str, page_num: int):
         """Сохраняет таблицу всех строк с сортировкой по y1"""
@@ -1183,7 +1028,7 @@ class FinalCorrectedAnalyzer:
         x0_repeated = {k: v for k, v in x0_counter.items() if v > 1}
         x1_repeated = {k: v for k, v in x1_counter.items() if v > 1}
         
-        # Находим значения рядом (разница менее 5 pt)
+        # Находим значения рядом (разница менее 5 пикселей)
         x0_sorted = sorted(x0_rounded)
         x1_sorted = sorted(x1_rounded)
         
@@ -1223,9 +1068,9 @@ class FinalCorrectedAnalyzer:
             for x0, count in sorted(x0_repeated.items(), key=lambda x: x[1], reverse=True):
                 f.write(f"  X0={x0:7.1f} - частота: {count:2d}\n")
             
-            f.write(f"\nЗначения x0 рядом (разница < 5pt): {len(x0_nearby)}\n")
+            f.write(f"\nЗначения x0 рядом (разница < 5px): {len(x0_nearby)}\n")
             for x0_a, x0_b, diff in x0_nearby[:20]:
-                f.write(f"  X0={x0_a:7.1f} и X0={x0_b:7.1f} - разница: {diff:.1f}pt\n")
+                f.write(f"  X0={x0_a:7.1f} и X0={x0_b:7.1f} - разница: {diff:.1f}px\n")
             
             f.write("\n" + "="*80 + "\n\n")
             
@@ -1245,14 +1090,14 @@ class FinalCorrectedAnalyzer:
             for x1, count in sorted(x1_repeated.items(), key=lambda x: x[1], reverse=True):
                 f.write(f"  X1={x1:7.1f} - частота: {count:2d}\n")
             
-            f.write(f"\nЗначения x1 рядом (разница < 5pt): {len(x1_nearby)}\n")
+            f.write(f"\nЗначения x1 рядом (разница < 5px): {len(x1_nearby)}\n")
             for x1_a, x1_b, diff in x1_nearby[:20]:
-                f.write(f"  X1={x1_a:7.1f} и X1={x1_b:7.1f} - разница: {diff:.1f}pt\n")
+                f.write(f"  X1={x1_a:7.1f} и X1={x1_b:7.1f} - разница: {diff:.1f}px\n")
             
             f.write("\n" + "="*80 + "\n\n")
             
             # Кластеризация значений
-            f.write("КЛАСТЕРИЗАЦИЯ ЗНАЧЕНИЙ (группировка по 5 pt)\n")
+            f.write("КЛАСТЕРИЗАЦИЯ ЗНАЧЕНИЙ (группировка по 5 пикселям)\n")
             f.write("-"*80 + "\n")
             
             # Кластеризация x0
@@ -1261,7 +1106,7 @@ class FinalCorrectedAnalyzer:
                 cluster = round(x0 / 5) * 5
                 x0_clusters[cluster] += 1
             
-            f.write("Кластеры x0 (шаг 5pt):\n")
+            f.write("Кластеры x0 (шаг 5px):\n")
             for cluster in sorted(x0_clusters.keys()):
                 f.write(f"  Кластер {cluster:7.1f}-{cluster+5:7.1f}: {x0_clusters[cluster]:2d} значений\n")
             
@@ -1273,7 +1118,7 @@ class FinalCorrectedAnalyzer:
                 cluster = round(x1 / 5) * 5
                 x1_clusters[cluster] += 1
             
-            f.write("Кластеры x1 (шаг 5pt):\n")
+            f.write("Кластеры x1 (шаг 5px):\n")
             for cluster in sorted(x1_clusters.keys()):
                 f.write(f"  Кластер {cluster:7.1f}-{cluster+5:7.1f}: {x1_clusters[cluster]:2d} значений\n")
         
@@ -1302,7 +1147,7 @@ class FinalCorrectedAnalyzer:
             y_start = int(line.y0)
             y_end = int(line.y1)
             # Для каждого y в диапазоне строки увеличиваем счетчик
-            for y in range(y_start+1, y_end):
+            for y in range(y_start, y_end + 1):
                 if 0 <= y <= 1000:  # Проверка границ массива
                     y_line_counts[y] += 1
         
@@ -1319,7 +1164,7 @@ class FinalCorrectedAnalyzer:
                 text_preview = str(line.text)[:40] + "..." if len(str(line.text)) > 40 else str(line.text)
                 f.write(f"{line_idx:5d} | {line.y0:5.1f} | {line.y1:5.1f} | {text_preview}\n")
             f.write("\n" + "="*80 + "\n\n")
-            f.write("СКАНИРОВАНИЕ ПО Y КОРДИНАТАМ (шаг 1 pt)\n")
+            f.write("СКАНИРОВАНИЕ ПО Y КОРДИНАТАМ (шаг 1 пиксель)\n")
             f.write("="*80 + "\n")
             f.write(f"Всего строк: {len(all_lines)}\n")
             f.write("="*80 + "\n\n")
@@ -1340,8 +1185,8 @@ class FinalCorrectedAnalyzer:
             non_zero_counts = [count for count in y_line_counts if count > 0]
             if non_zero_counts:
                 f.write(f"Максимальное количество строк на одном y: {max(non_zero_counts)}\n")
-                #f.write(f"Минимальное количество строк на одном y: {min(non_zero_counts)}\n")
-                #f.write(f"Среднее количество строк: {sum(non_zero_counts)/len(non_zero_counts):.2f}\n")
+                f.write(f"Минимальное количество строк на одном y: {min(non_zero_counts)}\n")
+                f.write(f"Среднее количество строк: {sum(non_zero_counts)/len(non_zero_counts):.2f}\n")
                 
                 # Y с максимальным количеством строк
                 max_count = max(non_zero_counts)
@@ -1351,7 +1196,7 @@ class FinalCorrectedAnalyzer:
         
         print(f"     📊 Сканирование по y: {y_scan_file}")
     
-    def _create_vertical_blocks(self, y_groups: List[YGroup], timestamp: str, debug_dir: str, page_num: int, clean_base_name: str) -> str:
+    def _create_vertical_blocks(self, y_groups: List[YGroup], timestamp: str, debug_dir: str, page_num: int) -> str:
         """Создает вертикальные блоки из строк"""
         # Собираем все строки из всех групп
         all_lines = []
@@ -1370,11 +1215,11 @@ class FinalCorrectedAnalyzer:
         # Вычисляем среднюю высоту строки
         line_heights = [l.y1 - l.y0 for l in sorted_lines]
         avg_height = sum(line_heights) / len(line_heights) if line_heights else 12.0
-        max_y_distance = avg_height * 1.5  # Расстояние не больше высоты 1.5 строки
+        max_y_distance = avg_height * 3  # Расстояние не больше высоты 3 строк
         
         print(f"\n  📊 Создание вертикальных блоков:")
-        print(f"    Средняя высота строки: {avg_height:.1f}pt")
-        print(f"    Максимальное расстояние по y: {max_y_distance:.1f}pt")
+        print(f"    Средняя высота строки: {avg_height:.1f}px")
+        print(f"    Максимальное расстояние по y: {max_y_distance:.1f}px")
         print(f"    Порог перекрытия: 70%")
         
         # Создаем блоки
@@ -1449,9 +1294,9 @@ class FinalCorrectedAnalyzer:
                             best_y_distance = y_distance
                             best_match = candidate_line
                             best_match_index = j
-                            debug_log.append(f"  ✓ Кандидат {j+1}: y_distance={y_distance:.1f}pt, overlap={overlap_percent:.1f}% - ЛУЧШИЙ")
+                            debug_log.append(f"  ✓ Кандидат {j+1}: y_distance={y_distance:.1f}px, overlap={overlap_percent:.1f}% - ЛУЧШИЙ")
                     else:
-                        debug_log.append(f"  ✗ Кандидат {j+1}: y_distance={y_distance:.1f}pt, overlap={overlap_percent:.1f}% - ОТКЛОНЕН (низкое перекрытие)")
+                        debug_log.append(f"  ✗ Кандидат {j+1}: y_distance={y_distance:.1f}px, overlap={overlap_percent:.1f}% - ОТКЛОНЕН (низкое перекрытие)")
                 
                 debug_log.append(f"  Проверено кандидатов: {candidates_checked}")
                 
@@ -1467,7 +1312,7 @@ class FinalCorrectedAnalyzer:
                     block_y0 = min(block_y0, best_match.y0)
                     block_y1 = max(block_y1, best_match.y1)
                     
-                    debug_log.append(f"  → Добавлена строка {best_match_index+1} с перекрытием {best_overlap:.1f}%, y_distance={best_y_distance:.1f}pt")
+                    debug_log.append(f"  → Добавлена строка {best_match_index+1} с перекрытием {best_overlap:.1f}%, y_distance={best_y_distance:.1f}px")
                     debug_log.append(f"     Блок: x0={block_x0:.1f}, x1={block_x1:.1f}, y0={block_y0:.1f}, y1={block_y1:.1f}")
                 else:
                     # Нет подходящих строк - блок завершен
@@ -1485,7 +1330,7 @@ class FinalCorrectedAnalyzer:
         self._analyze_block_structure(blocks, avg_height, timestamp, debug_dir, page_num)
 
         # Сбор итогового текста страницы
-        page_text = self._assemble_page_text(blocks, timestamp, debug_dir, page_num, clean_base_name)
+        page_text = self._assemble_page_text(blocks, timestamp, debug_dir, page_num)
 
         # Сохраняем результаты блоков
         blocks_file = os.path.join(debug_dir, f"{timestamp}_page{page_num:02d}_vertical_blocks.txt")
@@ -1495,8 +1340,8 @@ class FinalCorrectedAnalyzer:
             f.write("="*80 + "\n")
             f.write(f"Всего строк: {len(sorted_lines)}\n")
             f.write(f"Всего блоков: {len(blocks)}\n")
-            f.write(f"Средняя высота строки: {avg_height:.1f}pt\n")
-            f.write(f"Максимальное расстояние по y: {max_y_distance:.1f}pt\n")
+            f.write(f"Средняя высота строки: {avg_height:.1f}px\n")
+            f.write(f"Максимальное расстояние по y: {max_y_distance:.1f}px\n")
             f.write(f"Порог перекрытия: 70%\n")
             f.write("="*80 + "\n\n")
             
@@ -1519,8 +1364,8 @@ class FinalCorrectedAnalyzer:
             f.write("ОТЛАДОЧНЫЙ ЛОГ СОЗДАНИЯ ВЕРТИКАЛЬНЫХ БЛОКОВ\n")
             f.write("="*80 + "\n")
             f.write(f"Всего строк: {len(sorted_lines)}\n")
-            f.write(f"Средняя высота строки: {avg_height:.1f}pt\n")
-            f.write(f"Максимальное расстояние по y: {max_y_distance:.1f}pt\n")
+            f.write(f"Средняя высота строки: {avg_height:.1f}px\n")
+            f.write(f"Максимальное расстояние по y: {max_y_distance:.1f}px\n")
             f.write(f"Порог перекрытия: 70%\n")
             f.write("="*80 + "\n")
             
@@ -1618,12 +1463,12 @@ class FinalCorrectedAnalyzer:
         paragraph_threshold = avg_height * 1.5  # 1.5 высоты строки
         
         print(f"\n  📊 Анализ структуры блоков:")
-        print(f"    Порог разделения: {paragraph_threshold:.1f}pt")
+        print(f"    Порог разделения: {paragraph_threshold:.1f}px")
         
         structure_log = []
         structure_log.append("СТРУКТУРА БЛОКОВ (ПАРАГРАФЫ И ЗАГОЛОВКИ)")
         structure_log.append("="*80)
-        structure_log.append(f"Порог разделения: {paragraph_threshold:.1f}pt (1.5 * avg_height)")
+        structure_log.append(f"Порог разделения: {paragraph_threshold:.1f}px (1.5 * avg_height)")
         structure_log.append("="*80 + "\n")
         
         for block_idx, block in enumerate(blocks):
@@ -1650,7 +1495,7 @@ class FinalCorrectedAnalyzer:
                     # Большой разрыв - это заголовок, начинаем новый параграф
                     paragraphs.append(('paragraph', current_paragraph))
                     current_paragraph = [curr_line]
-                    structure_log.append(f"  ЗАГОЛОВК/НОВЫЙ ПАРАГРАФ после строки {i}: gap={gap:.1f}pt")
+                    structure_log.append(f"  ЗАГОЛОВК/НОВЫЙ ПАРАГРАФ после строки {i}: gap={gap:.1f}px")
                 else:
                     # Маленький разрыв - продолжение параграфа
                     current_paragraph.append(curr_line)
@@ -1675,7 +1520,7 @@ class FinalCorrectedAnalyzer:
         
         print(f"     📊 Структура блоков: {structure_file}")
 
-    def _assemble_page_text(self, blocks: List[List], timestamp: str, debug_dir: str, page_num: int, clean_base_name: str) -> str:
+    def _assemble_page_text(self, blocks: List[List], timestamp: str, debug_dir: str, page_num: int) -> str:
         """Собирает итоговый текст страницы с учетом структуры блоков, возвращает текст"""
         # Вычисляем координаты каждого блока
         block_coords = []
@@ -1722,7 +1567,7 @@ class FinalCorrectedAnalyzer:
             if not added:
                 y_levels.append([block])
         
-        # Собираем текст по уровням со сквозной нумерацией блоков
+        # Собираем текст по уровням
         page_text = []
         page_text.append("ТЕКСТ СТРАНИЦЫ")
         page_text.append("="*80)
@@ -1736,16 +1581,13 @@ class FinalCorrectedAnalyzer:
                 level_sorted = sorted(level, key=lambda b: b['x0'])  # слева направо
             
             for block in level_sorted:
-                self.global_block_counter += 1  # Увеличиваем глобальный счетчик
-                page_text.append(f"БЛОК {self.global_block_counter}:")
+                page_text.append(f"БЛОК {block['index']+1}:")
                 for line in block['lines']:
                     page_text.append(str(line.text))
                 page_text.append("")
         
-        # Сохраняем результаты (только TXT в DEBUG_DIR)
-        text_file = os.path.join(debug_dir, f"{timestamp}_{clean_base_name}_page{page_num:02d}_raw.txt")
-        
-        # TXT формат
+        # Сохраняем результаты
+        text_file = os.path.join(debug_dir, f"{timestamp}_page{page_num:02d}_page_text.txt")
         with open(text_file, 'w', encoding='utf-8') as f:
             f.write("\n".join(page_text))
 
@@ -1755,74 +1597,20 @@ class FinalCorrectedAnalyzer:
         return "\n".join(page_text)
 
 def main():
-    """Основная функция с интеграцией конфига и умным поиском файлов"""
-    # 1. Загрузка конфигурации
-    CONF = utils.load_local_config()
-    if not CONF:
-        utils.tbox_log("Критическая ошибка: Конфиг не найден.", META, "ERROR", CONF)
-        return
-
-    # Получаем директории из конфига или используем дефолтные
-    INBOX_DIR = CONF.get('INBOX_DIR', '/Users/kivaonmac/Documents/AI_Lab/01_INBOX')
-    RAW_DIR = CONF.get('TXT_RAW', OUTPUT_CONFIG['txt_raw'])
-
-    # 2. Логика поиска файла
-    user_arg = sys.argv[1] if len(sys.argv) > 1 else None
-    target_path = None
-
-    if user_arg:
-        if os.path.exists(user_arg):
-            target_path = os.path.abspath(user_arg)
-        else:
-            # Умный поиск по частичному совпадению имени
-            files = [f for f in os.listdir(INBOX_DIR) if f.lower().endswith('.pdf')]
-            matches = [f for f in files if user_arg.lower() in f.lower()]
-            if matches:
-                full_matches = [os.path.join(INBOX_DIR, f) for f in matches]
-                target_path = max(full_matches, key=os.path.getmtime)
-    else:
-        # Автоматический выбор последнего файла
-        files = [os.path.join(INBOX_DIR, f) for f in os.listdir(INBOX_DIR) if f.lower().endswith('.pdf')]
-        if files:
-            target_path = max(files, key=os.path.getmtime)
-
-    if not target_path:
-        utils.tbox_log("Целевой файл не определен.", META, "ERROR", CONF)
-        print("Использование: python tbox_extract_pdf.py <pdf_file>")
+    """Основная функция"""
+    if len(sys.argv) < 2:
+        print("Использование: python tbox_final_corrected.py <pdf_file>")
         sys.exit(1)
-
-    utils.tbox_log(f"Обработка файла: {os.path.basename(target_path)}", META, "START", CONF)
-
-    # 3. Анализ PDF
-    analyzer = FinalCorrectedAnalyzer(debug_mode=False)
-    success = analyzer.analyze_page_with_final_corrected(target_path)
-
+    
+    pdf_path = sys.argv[1]
+    
+    analyzer = FinalCorrectedAnalyzer(debug_mode=True)
+    success = analyzer.analyze_page_with_final_corrected(pdf_path)
+    
     if success:
-        utils.tbox_log(f"✅ Анализ завершен успешно", META, "DONE", CONF)
-
-        # 4. Интеграция с Refinery
-        if refinery:
-            # Находим последний созданный файл в RAW_DIR
-            txt_files = [os.path.join(RAW_DIR, f) for f in os.listdir(RAW_DIR) if f.endswith('_raw.txt')]
-            if txt_files:
-                last_txt = max(txt_files, key=os.path.getmtime)
-                utils.tbox_log(f"Передача в Refinery: {os.path.basename(last_txt)}", META, "INFO", CONF)
-
-                # Определяем режим на основе наличия RTL текста
-                # Проверяем есть ли иврит в тексте
-                try:
-                    with open(last_txt, 'r', encoding='utf-8') as f:
-                        content = f.read(1000)  # Проверяем первые 1000 символов
-                        is_hebrew = bool(re.search(r'[\u0590-\u05FF]', content))
-                        mode = "PDF_HE" if is_hebrew else "PDF"
-                        refinery.run_refining(last_txt, mode=mode)
-                        utils.tbox_log(f"Refinery завершен (режим: {mode})", META, "DONE", CONF)
-                except Exception as e:
-                    utils.tbox_log(f"Ошибка Refinery: {e}", META, "WARNING", CONF)
-        else:
-            utils.tbox_log("Refinery не найден, автоматическая верстка пропущена.", META, "WARNING", CONF)
+        print(f"\n✅ Анализ с финальными исправлениями завершен успешно")
     else:
-        utils.tbox_log(f"❌ Анализ завершен с ошибками", META, "ERROR", CONF)
+        print(f"\n❌ Анализ завершен с ошибками")
         sys.exit(1)
 
 if __name__ == "__main__":

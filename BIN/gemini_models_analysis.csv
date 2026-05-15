@@ -1,0 +1,39 @@
+№,Название,Доступность,Квота,Exception,Тип,Версия,Доп.названия,Лимиты (вых/вых),Оценка
+1,gemini-2.5-flash,available,1,048,576/65,536,Доступна,gemini-flash,2.5.0,flash,1,048,576/65,536,100
+2,gemini-2.5-flash-lite,available,1,048,576/65,536,Доступна,gemini-flash,2.5.0,lite,flash,1,048,576/65,536,100
+3,gemini-3-flash-preview,available,1,048,576/65,536,Доступна,gemini-flash,0.0.0,preview,flash,1,048,576/65,536,100
+4,gemini-robotics-er-1.5-preview,available,1,048,576/65,536,Доступна,gemini,1.5.0,preview,robotics,1,048,576/65,536,93
+5,gemini-robotics-er-1.6-preview,available,131,072/65,536,Доступна,gemini,1.6.0,preview,robotics,131,072/65,536,83
+6,gemini-3.1-flash-lite-preview,quota_exhausted,1,048,576/65,536,"Исключение: квота исчерпана (429)",gemini-flash,3.1.0,preview,lite,flash,1,048,576/65,536,75
+7,gemini-2.0-flash,quota_exhausted,1,048,576/8,192,"Исключение: квота исчерпана (429)",gemini-flash,2.0.0,flash,1,048,576/8,192,70
+8,gemini-2.0-flash-001,quota_exhausted,1,048,576/8,192,"Исключение: квота исчерпана (429)",gemini-flash,2.0.1,001,flash,1,048,576/8,192,70
+9,gemini-2.0-flash-lite-001,quota_exhausted,1,048,576/8,192,"Исключение: квота исчерпана (429)",gemini-flash,2.0.1,001,lite,flash,1,048,576/8,192,70
+10,gemini-2.0-flash-lite,quota_exhausted,1,048,576/8,192,"Исключение: квота исчерпана (429)",gemini-flash,2.0.0,lite,flash,1,048,576/8,192,70
+11,gemini-2.5-pro,quota_exhausted,1,048,576/65,536,"Исключение: квота исчерпана (429)",gemini-pro,2.5.0,pro,1,048,576/65,536,68
+12,gemini-3-pro-preview,quota_exhausted,1,048,576/65,536,"Исключение: квота исчерпана (429)",gemini-pro,0.0.0,preview,pro,1,048,576/65,536,68
+13,gemini-3.1-pro-preview,quota_exhausted,1,048,576/65,536,"Исключение: квота исчерпана (429)",gemini-pro,3.1.0,preview,pro,1,048,576/65,536,68
+14,gemini-3.1-pro-preview-customtools,quota_exhausted,1,048,576/65,536,"Исключение: квота исчерпана (429)",gemini-pro,3.1.0,preview,customtools,pro,1,048,576/65,536,68
+15,lyria-3-pro-preview,quota_exhausted,1,048,576/65,536,"Исключение: квота исчерпана (429)",lyria,0.0.0,preview,pro,1,048,576/65,536,68
+16,lyria-3-clip-preview,quota_exhausted,1,048,576/65,536,"Исключение: квота исчерпана (429)",lyria,0.0.0,preview,clip,1,048,576/65,536,63
+17,deep-research-pro-preview-12-2025,error,131,072/65,536,"Исключение: ошибка API (Ошибка 400)",deep-research,0.0.0,preview,pro,131,072/65,536,63
+18,gemini-3-pro-image-preview,quota_exhausted,131,072/32,768,"Исключение: квота исчерпана (429)",gemini-pro,0.0.0,preview,image,pro,131,072/32,768,58
+19,nano-banana-pro-preview,quota_exhausted,131,072/32,768,"Исключение: квота исчерпана (429)",nano-banana,0.0.0,preview,pro,131,072/32,768,58
+20,deep-research-max-preview-04-2026,error,131,072/65,536,"Исключение: ошибка API (Ошибка 400)",deep-research,0.0.0,preview,131,072/65,536,58
+21,deep-research-preview-04-2026,error,131,072/65,536,"Исключение: ошибка API (Ошибка 400)",deep-research,0.0.0,preview,131,072/65,536,58
+22,gemini-2.5-computer-use-preview-10-2025,quota_exhausted,131,072/65,536,"Исключение: квота исчерпана (429)",gemini,2.5.0,preview,computer,131,072/65,536,53
+23,gemini-3.1-flash-image-preview,quota_exhausted,65,536/65,536,"Исключение: квота исчерпана (429)",gemini-flash,3.1.0,preview,image,flash,65,536/65,536,50
+24,gemini-2.5-flash-preview-tts,error,8,192/16,384,"Исключение: ошибка API (Ошибка 400)",gemini-flash,2.5.0,preview,tts,flash,8,192/16,384,45
+25,gemini-3.1-flash-tts-preview,error,8,192/16,384,"Исключение: ошибка API (Ошибка 400)",gemini-flash,3.1.0,preview,tts,flash,8,192/16,384,45
+26,gemini-2.5-pro-preview-tts,quota_exhausted,8,192/16,384,"Исключение: квота исчерпана (429)",gemini-pro,2.5.0,preview,tts,pro,8,192/16,384,38
+27,gemini-flash-latest,not_found,0/0,"Исключение: лимиты 0/0 (не поддерживает generateContent)",gemini-flash,0.0.0,latest,flash,0/0,10
+28,gemini-flash-lite-latest,not_found,0/0,"Исключение: лимиты 0/0 (не поддерживает generateContent)",gemini-flash,0.0.0,latest,lite,flash,0/0,10
+29,gemini-2.5-flash-image,not_found,0/0,"Исключение: лимиты 0/0 (не поддерживает generateContent)",gemini-flash,2.5.0,image,flash,0/0,10
+30,gemini-pro-latest,not_found,0/0,"Исключение: лимиты 0/0 (не поддерживает generateContent)",gemini-pro,0.0.0,latest,pro,0/0,8
+31,gemma-3-1b-it,not_found,0/0,"Исключение: лимиты 0/0 (не поддерживает generateContent)",gemma,0.0.0,none,0/0,3
+32,gemma-3-4b-it,not_found,0/0,"Исключение: лимиты 0/0 (не поддерживает generateContent)",gemma,0.0.0,none,0/0,3
+33,gemma-3-12b-it,not_found,0/0,"Исключение: лимиты 0/0 (не поддерживает generateContent)",gemma,0.0.0,none,0/0,3
+34,gemma-3-27b-it,not_found,0/0,"Исключение: лимиты 0/0 (не поддерживает generateContent)",gemma,0.0.0,none,0/0,3
+35,gemma-3n-e4b-it,not_found,0/0,"Исключение: лимиты 0/0 (не поддерживает generateContent)",gemma,0.0.0,none,0/0,3
+36,gemma-3n-e2b-it,not_found,0/0,"Исключение: лимиты 0/0 (не поддерживает generateContent)",gemma,0.0.0,none,0/0,3
+37,gemma-4-26b-a4b-it,not_found,0/0,"Исключение: лимиты 0/0 (не поддерживает generateContent)",gemma,0.0.0,none,0/0,3
+38,gemma-4-31b-it,not_found,0/0,"Исключение: лимиты 0/0 (не поддерживает generateContent)",gemma,0.0.0,none,0/0,3

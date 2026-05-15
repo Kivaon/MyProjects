@@ -1,0 +1,117 @@
+﻿name,display_name,description,version,has_generate_content,max_output_tokens,methods,api_version
+gemini-2.5-flash,Gemini 2.5 Flash,"Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June of 2025.",001,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.5-pro,Gemini 2.5 Pro,"Stable release (June 17th, 2025) of Gemini 2.5 Pro",2.5,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.0-flash,Gemini 2.0 Flash,Gemini 2.0 Flash,2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.0-flash-001,Gemini 2.0 Flash 001,"Stable version of Gemini 2.0 Flash, our fast and versatile multimodal model for scaling across diverse tasks, released in January of 2025.",2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.0-flash-lite-001,Gemini 2.0 Flash-Lite 001,Stable version of Gemini 2.0 Flash-Lite,2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.0-flash-lite,Gemini 2.0 Flash-Lite,Gemini 2.0 Flash-Lite,2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.5-flash-preview-tts,Gemini 2.5 Flash Preview TTS,Gemini 2.5 Flash Preview TTS,gemini-2.5-flash-exp-tts-2025-05-19,True,0,"countTokens, generateContent",v1beta
+gemini-2.5-pro-preview-tts,Gemini 2.5 Pro Preview TTS,Gemini 2.5 Pro Preview TTS,gemini-2.5-pro-preview-tts-2025-05-19,True,0,"countTokens, generateContent, batchGenerateContent",v1beta
+gemma-3-1b-it,Gemma 3 1B,,001,True,0,"generateContent, countTokens",v1beta
+gemma-3-4b-it,Gemma 3 4B,,001,True,0,"generateContent, countTokens",v1beta
+gemma-3-12b-it,Gemma 3 12B,,001,True,0,"generateContent, countTokens",v1beta
+gemma-3-27b-it,Gemma 3 27B,,001,True,0,"generateContent, countTokens",v1beta
+gemma-3n-e4b-it,Gemma 3n E4B,,001,True,0,"generateContent, countTokens",v1beta
+gemma-3n-e2b-it,Gemma 3n E2B,,001,True,0,"generateContent, countTokens",v1beta
+gemma-4-26b-a4b-it,Gemma 4 26B A4B IT,Gemma 4 26B A4B IT,001,True,0,"generateContent, countTokens",v1beta
+gemma-4-31b-it,Gemma 4 31B IT,Gemma 4 31B IT,001,True,0,"generateContent, countTokens",v1beta
+gemini-flash-latest,Gemini Flash Latest,Latest release of Gemini Flash,Gemini Flash Latest,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-flash-lite-latest,Gemini Flash-Lite Latest,Latest release of Gemini Flash-Lite,Gemini Flash-Lite Latest,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-pro-latest,Gemini Pro Latest,Latest release of Gemini Pro,Gemini Pro Latest,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.5-flash-lite,Gemini 2.5 Flash-Lite,"Stable version of Gemini 2.5 Flash-Lite, released in July of 2025",001,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.5-flash-image,Nano Banana,Gemini 2.5 Flash Preview Image,2.0,True,0,"generateContent, countTokens, batchGenerateContent",v1beta
+gemini-3-pro-preview,Gemini 3 Pro Preview,Gemini 3 Pro Preview,3-pro-preview-11-2025,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-3-flash-preview,Gemini 3 Flash Preview,Gemini 3 Flash Preview,3-flash-preview-12-2025,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-3.1-pro-preview,Gemini 3.1 Pro Preview,Gemini 3.1 Pro Preview,3.1-pro-preview-01-2026,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-3.1-pro-preview-customtools,Gemini 3.1 Pro Preview Custom Tools,Gemini 3.1 Pro Preview optimized for custom tool usage,3.1-pro-preview-01-2026,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-3.1-flash-lite-preview,Gemini 3.1 Flash Lite Preview,Gemini 3.1 Flash Lite Preview,3.1-flash-lite-preview-03-2026,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-3-pro-image-preview,Nano Banana Pro,Gemini 3 Pro Image Preview,3.0,True,0,"generateContent, countTokens, batchGenerateContent",v1beta
+nano-banana-pro-preview,Nano Banana Pro,Gemini 3 Pro Image Preview,3.0,True,0,"generateContent, countTokens, batchGenerateContent",v1beta
+gemini-3.1-flash-image-preview,Nano Banana 2,Gemini 3.1 Flash Image Preview.,3.0,True,0,"generateContent, countTokens, batchGenerateContent",v1beta
+lyria-3-clip-preview,Lyria 3 Clip Preview,Lyria 3 30s model Preview,lyria-3-clip-preview,True,0,"generateContent, countTokens",v1beta
+lyria-3-pro-preview,Lyria 3 Pro Preview,Lyria 3 Pro Preview,lyria-3-pro-preview,True,0,"generateContent, countTokens",v1beta
+gemini-3.1-flash-tts-preview,Gemini 3.1 Flash TTS Preview,Gemini 3.1 Flash TTS Preview,3.1-flash-tts-preview,True,0,"generateContent, countTokens, batchGenerateContent",v1beta
+gemini-robotics-er-1.5-preview,Gemini Robotics-ER 1.5 Preview,Gemini Robotics-ER 1.5 Preview,1.5-preview,True,0,"generateContent, countTokens",v1beta
+gemini-robotics-er-1.6-preview,Gemini Robotics-ER 1.6 Preview,Gemini Robotics-ER 1.6 Preview,1.6-preview,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.5-computer-use-preview-10-2025,Gemini 2.5 Computer Use Preview 10-2025,Gemini 2.5 Computer Use Preview 10-2025,Gemini 2.5 Computer Use Preview 10-2025,True,0,"generateContent, countTokens",v1beta
+deep-research-max-preview-04-2026,Deep Research Max Preview (Apr-21-2026),"Preview release (April 21st, 2026) of Deep Research Max",deepthink-exp-05-20,True,0,"generateContent, countTokens",v1beta
+deep-research-preview-04-2026,Deep Research Preview (Apr-21-2026),"Preview release (April 21th, 2026) of Deep Research",deepthink-exp-05-20,True,0,"generateContent, countTokens",v1beta
+deep-research-pro-preview-12-2025,Deep Research Pro Preview (Dec-12-2025),"Preview release (December 12th, 2025) of Deep Research Pro",deepthink-exp-05-20,True,0,"generateContent, countTokens",v1beta
+gemini-embedding-001,Gemini Embedding 001,Obtain a distributed representation of a text.,001,False,0,"embedContent, countTextTokens, countTokens, asyncBatchEmbedContent",v1beta
+gemini-embedding-2-preview,Gemini Embedding 2 Preview,Obtain a distributed representation of multimodal content.,2,False,0,"embedContent, countTextTokens, countTokens, asyncBatchEmbedContent",v1beta
+gemini-embedding-2,Gemini Embedding 2,Obtain a distributed representation of multimodal content.,2,False,0,"embedContent, countTextTokens, countTokens, asyncBatchEmbedContent",v1beta
+aqa,Model that performs Attributed Question Answering.,"Model trained to return answers to questions that are grounded in provided sources, along with estimating answerable probability.",001,False,0,generateAnswer,v1beta
+imagen-4.0-generate-001,Imagen 4,Vertex served Imagen 4.0 model,001,False,0,predict,v1beta
+imagen-4.0-ultra-generate-001,Imagen 4 Ultra,Vertex served Imagen 4.0 ultra model,001,False,0,predict,v1beta
+imagen-4.0-fast-generate-001,Imagen 4 Fast,Vertex served Imagen 4.0 Fast model,001,False,0,predict,v1beta
+veo-2.0-generate-001,Veo 2,Vertex served Veo 2 model. Access to this model requires billing to be enabled on the associated Google Cloud Platform account. Please visit https://console.cloud.google.com/billing to enable it.,2.0,False,0,predictLongRunning,v1beta
+veo-3.0-generate-001,Veo 3,Veo 3,3.0,False,0,predictLongRunning,v1beta
+veo-3.0-fast-generate-001,Veo 3 fast,Veo 3 fast,3.0,False,0,predictLongRunning,v1beta
+veo-3.1-generate-preview,Veo 3.1,Veo 3.1,3.1,False,0,predictLongRunning,v1beta
+veo-3.1-fast-generate-preview,Veo 3.1 fast,Veo 3.1 fast,3.1,False,0,predictLongRunning,v1beta
+gemini-2.5-flash,Gemini 2.5 Flash,"Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June of 2025.",001,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+gemini-2.5-pro,Gemini 2.5 Pro,"Stable release (June 17th, 2025) of Gemini 2.5 Pro",2.5,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+gemini-2.0-flash,Gemini 2.0 Flash,Gemini 2.0 Flash,2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+gemini-2.0-flash-001,Gemini 2.0 Flash 001,"Stable version of Gemini 2.0 Flash, our fast and versatile multimodal model for scaling across diverse tasks, released in January of 2025.",2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+gemini-2.0-flash-lite-001,Gemini 2.0 Flash-Lite 001,Stable version of Gemini 2.0 Flash-Lite,2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+gemini-2.0-flash-lite,Gemini 2.0 Flash-Lite,Gemini 2.0 Flash-Lite,2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+gemini-2.5-flash-lite,Gemini 2.5 Flash-Lite,"Stable version of Gemini 2.5 Flash-Lite, released in July of 2025",001,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+
+================================================================================
+# ЭТАП 1: ПОСЛЕ ФИЛЬТРАЦИИ GET
+================================================================================
+
+name,display_name,description,version,has_generate_content,max_output_tokens,methods,api_version
+gemini-2.5-flash,Gemini 2.5 Flash,"Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June of 2025.",001,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.5-pro,Gemini 2.5 Pro,"Stable release (June 17th, 2025) of Gemini 2.5 Pro",2.5,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.0-flash,Gemini 2.0 Flash,Gemini 2.0 Flash,2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.0-flash-001,Gemini 2.0 Flash 001,"Stable version of Gemini 2.0 Flash, our fast and versatile multimodal model for scaling across diverse tasks, released in January of 2025.",2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.0-flash-lite-001,Gemini 2.0 Flash-Lite 001,Stable version of Gemini 2.0 Flash-Lite,2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.0-flash-lite,Gemini 2.0 Flash-Lite,Gemini 2.0 Flash-Lite,2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemma-3-1b-it,Gemma 3 1B,,001,True,0,"generateContent, countTokens",v1beta
+gemma-3-4b-it,Gemma 3 4B,,001,True,0,"generateContent, countTokens",v1beta
+gemma-3-12b-it,Gemma 3 12B,,001,True,0,"generateContent, countTokens",v1beta
+gemma-3-27b-it,Gemma 3 27B,,001,True,0,"generateContent, countTokens",v1beta
+gemma-3n-e4b-it,Gemma 3n E4B,,001,True,0,"generateContent, countTokens",v1beta
+gemma-3n-e2b-it,Gemma 3n E2B,,001,True,0,"generateContent, countTokens",v1beta
+gemma-4-26b-a4b-it,Gemma 4 26B A4B IT,Gemma 4 26B A4B IT,001,True,0,"generateContent, countTokens",v1beta
+gemma-4-31b-it,Gemma 4 31B IT,Gemma 4 31B IT,001,True,0,"generateContent, countTokens",v1beta
+gemini-flash-latest,Gemini Flash Latest,Latest release of Gemini Flash,Gemini Flash Latest,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-flash-lite-latest,Gemini Flash-Lite Latest,Latest release of Gemini Flash-Lite,Gemini Flash-Lite Latest,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-pro-latest,Gemini Pro Latest,Latest release of Gemini Pro,Gemini Pro Latest,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.5-flash-lite,Gemini 2.5 Flash-Lite,"Stable version of Gemini 2.5 Flash-Lite, released in July of 2025",001,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-2.5-flash-image,Nano Banana,Gemini 2.5 Flash Preview Image,2.0,True,0,"generateContent, countTokens, batchGenerateContent",v1beta
+gemini-3-pro-preview,Gemini 3 Pro Preview,Gemini 3 Pro Preview,3-pro-preview-11-2025,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-3-flash-preview,Gemini 3 Flash Preview,Gemini 3 Flash Preview,3-flash-preview-12-2025,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-3.1-pro-preview,Gemini 3.1 Pro Preview,Gemini 3.1 Pro Preview,3.1-pro-preview-01-2026,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-3.1-pro-preview-customtools,Gemini 3.1 Pro Preview Custom Tools,Gemini 3.1 Pro Preview optimized for custom tool usage,3.1-pro-preview-01-2026,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-3.1-flash-lite-preview,Gemini 3.1 Flash Lite Preview,Gemini 3.1 Flash Lite Preview,3.1-flash-lite-preview-03-2026,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+gemini-3-pro-image-preview,Nano Banana Pro,Gemini 3 Pro Image Preview,3.0,True,0,"generateContent, countTokens, batchGenerateContent",v1beta
+nano-banana-pro-preview,Nano Banana Pro,Gemini 3 Pro Image Preview,3.0,True,0,"generateContent, countTokens, batchGenerateContent",v1beta
+gemini-3.1-flash-image-preview,Nano Banana 2,Gemini 3.1 Flash Image Preview.,3.0,True,0,"generateContent, countTokens, batchGenerateContent",v1beta
+lyria-3-clip-preview,Lyria 3 Clip Preview,Lyria 3 30s model Preview,lyria-3-clip-preview,True,0,"generateContent, countTokens",v1beta
+lyria-3-pro-preview,Lyria 3 Pro Preview,Lyria 3 Pro Preview,lyria-3-pro-preview,True,0,"generateContent, countTokens",v1beta
+deep-research-max-preview-04-2026,Deep Research Max Preview (Apr-21-2026),"Preview release (April 21st, 2026) of Deep Research Max",deepthink-exp-05-20,True,0,"generateContent, countTokens",v1beta
+deep-research-preview-04-2026,Deep Research Preview (Apr-21-2026),"Preview release (April 21th, 2026) of Deep Research",deepthink-exp-05-20,True,0,"generateContent, countTokens",v1beta
+deep-research-pro-preview-12-2025,Deep Research Pro Preview (Dec-12-2025),"Preview release (December 12th, 2025) of Deep Research Pro",deepthink-exp-05-20,True,0,"generateContent, countTokens",v1beta
+gemini-2.5-flash,Gemini 2.5 Flash,"Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June of 2025.",001,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+gemini-2.5-pro,Gemini 2.5 Pro,"Stable release (June 17th, 2025) of Gemini 2.5 Pro",2.5,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+gemini-2.0-flash,Gemini 2.0 Flash,Gemini 2.0 Flash,2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+gemini-2.0-flash-001,Gemini 2.0 Flash 001,"Stable version of Gemini 2.0 Flash, our fast and versatile multimodal model for scaling across diverse tasks, released in January of 2025.",2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+gemini-2.0-flash-lite-001,Gemini 2.0 Flash-Lite 001,Stable version of Gemini 2.0 Flash-Lite,2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+gemini-2.0-flash-lite,Gemini 2.0 Flash-Lite,Gemini 2.0 Flash-Lite,2.0,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+gemini-2.5-flash-lite,Gemini 2.5 Flash-Lite,"Stable version of Gemini 2.5 Flash-Lite, released in July of 2025",001,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1
+
+================================================================================
+# ЭТАП 2: ПОСЛЕ ТЕСТА POST
+================================================================================
+
+name,display_name,description,version,has_generate_content,max_output_tokens,methods,api_version
+gemini-2.5-flash,Gemini 2.5 Flash,"Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June of 2025.",001,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta
+
+================================================================================
+# ЭТАП 3: ФИНАЛЬНЫЙ СПИСОК
+================================================================================
+
+name,display_name,description,version,has_generate_content,max_output_tokens,methods,api_version
+gemini-2.5-flash,Gemini 2.5 Flash,"Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June of 2025.",001,True,0,"generateContent, countTokens, createCachedContent, batchGenerateContent",v1beta

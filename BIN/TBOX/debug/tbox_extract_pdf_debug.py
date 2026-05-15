@@ -7,13 +7,15 @@ import re
 import pdfplumber
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
+from collections import Counter
 import tbox_utils as utils
 
 # Импортируем наш универсальный Refinery
-try:
-    import tbox_refine_standalone as refinery
-except ImportError:
-    refinery = None
+# try:
+#     import tbox_refine_standalone as refinery
+# except ImportError:
+#     refinery = None
+refinery = None  # Временно отключено для тестирования
 
 # Конфигурация директорий вывода
 OUTPUT_CONFIG = {
@@ -30,10 +32,10 @@ from dataclasses import dataclass
 from collections import defaultdict
 
 # --- ПАСПОРТ ---
-VERSION = "v3.30.release"
-DATE    = "2026-05-11"
-NAME = os.path.basename(__file__)
-META = {"name": NAME, "version": VERSION, "date": DATE}
+VERSION = "v3.29.final-corrected"
+DATE    = "2026-05-08"
+NAME    = os.path.basename(__file__)
+META    = {"name": NAME, "version": VERSION, "date": DATE}
 
 # Конфигурация языков с направлениями текста
 LANGUAGE_CONFIGS = {
@@ -362,11 +364,14 @@ class FinalCorrectedAnalyzer:
                 # Анализируем все страницы
                 all_page_text = []
                 timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
-                debug_dir = OUTPUT_CONFIG['debug_dir']
                 
                 # Формируем имя файла из оригинального PDF
                 original_name = os.path.basename(pdf_path)
                 clean_base_name = original_name.replace('.pdf', '').replace('.PDF', '')
+                
+                # Создаем подпапку для текущего запуска
+                debug_dir = os.path.join(OUTPUT_CONFIG['debug_dir'], f"{timestamp}_{clean_base_name}")
+                os.makedirs(debug_dir, exist_ok=True)
 
                 for page_num, page in enumerate(pdf.pages, 1):
                     print(f"\n{'='*60}")
@@ -410,9 +415,81 @@ class FinalCorrectedAnalyzer:
         print("ШАГ 1: ИЗВЛЕЧЕНИЕ СЛОВ ИЗ PDF")
         print("="*60)
         
-        # ШАГ 1: Извлекаем слова из PDF
+        # ШАГ 1: Извлекаем слова из PDF и размеры шрифтов
         raw_words = page.extract_words()
         print(f"  📊 Извлечено слов: {len(raw_words)}")
+
+        # Извлекаем символы для получения размеров шрифтов
+        chars = page.chars if hasattr(page, 'chars') else []
+
+        # Создаем маппинг координат к размерам шрифтов
+        # Для каждого символа сохраняем его размер и координаты
+        char_font_sizes = []
+        for char in chars:
+            if char.get('text', '').strip():  # Игнорируем пробелы
+                char_font_sizes.append({
+                    'x0': char['x0'],
+                    'x1': char['x1'],
+                    'y0': char['y0'],
+                    'y1': char['y1'],
+                    'size': char.get('size', 12.0),
+                    'fontname': char.get('fontname', 'unknown')
+                })
+
+        # Функция для получения среднего размера шрифта слова
+        def get_word_font_size(word):
+            """Получает средний размер шрифта для слова на основе координат"""
+            word_x0, word_y0, word_x1, word_y1 = word['x0'], word['top'], word['x1'], word.get('bottom', word['top'] + 12)
+
+            # Находим символы, которые пересекаются с областью слова
+            matching_chars = []
+            for char in char_font_sizes:
+                # Проверяем пересечение по X и Y
+                if (char['x0'] >= word_x0 and char['x1'] <= word_x1 and
+                    char['y0'] >= word_y0 and char['y1'] <= word_y1):
+                    matching_chars.append(char['size'])
+
+            if matching_chars:
+                return sum(matching_chars) / len(matching_chars)
+            return 12.0  # Дефолтное значение
+
+        # Добавляем размер шрифта к каждому слову
+        for word in raw_words:
+            word['font_size'] = get_word_font_size(word)
+
+        # Статистика по размерам шрифтов
+        font_sizes = [w['font_size'] for w in raw_words]
+        if font_sizes:
+            avg_font_size = sum(font_sizes) / len(font_sizes)
+            min_font_size = min(font_sizes)
+            max_font_size = max(font_sizes)
+            print(f"  📊 Размеры шрифтов: min={min_font_size:.1f}pt, max={max_font_size:.1f}pt, avg={avg_font_size:.1f}pt")
+
+            # Сохраняем детальную статистику шрифтов
+            font_stats_file = os.path.join(debug_dir, f"{timestamp}_page{page_num:02d}_font_statistics.txt")
+            with open(font_stats_file, 'w', encoding='utf-8') as f:
+                f.write(f"СТАТИСТИКА РАЗМЕРОВ ШРИФТОВ - СТРАНИЦА {page_num}\n")
+                f.write("="*60 + "\n\n")
+                f.write(f"Всего слов: {len(raw_words)}\n")
+                f.write(f"Минимальный размер: {min_font_size:.1f}pt\n")
+                f.write(f"Максимальный размер: {max_font_size:.1f}pt\n")
+                f.write(f"Средний размер: {avg_font_size:.1f}pt\n\n")
+
+                # Распределение по размерам
+                size_distribution = Counter(round(fs, 1) for fs in font_sizes)
+                f.write("РАСПРЕДЕЛЕНИЕ ПО РАЗМЕРАМ:\n")
+                for size, count in sorted(size_distribution.items()):
+                    percentage = (count / len(font_sizes)) * 100
+                    f.write(f"  {size:5.1f}pt: {count:4d} слов ({percentage:5.1f}%)\n")
+
+                f.write("\nДЕТАЛЬНАЯ ИНФОРМАЦИЯ ПО СЛОВАМ:\n")
+                for i, word in enumerate(raw_words):
+                    f.write(f"  {i+1:3d}. '{word['text']:20s}' - шрифт: {word['font_size']:5.1f}pt, x0={word['x0']:6.1f}, x1={word['x1']:6.1f}, y0={word['top']:6.1f}, y1={word.get('bottom', word['top'] + 12):6.1f}\n")
+
+            print(f"     📁 Статистика шрифтов: {font_stats_file}")
+        else:
+            avg_font_size = 12.0
+            print(f"  📊 Размеры шрифтов: не определены (используем 12.0pt)")
 
         # Обработка пустых страниц
         if len(raw_words) == 0:
@@ -457,12 +534,7 @@ class FinalCorrectedAnalyzer:
             print(f"  {'-'*5} {'-'*12} {'-'*12} {'-'*8}")
             
             # Сохраняем таблицу в файл
-            import os
-            from datetime import datetime
-            debug_dir = "/Users/kivaonmac/Documents/AI_Lab/02_TXT/debug"
-            os.makedirs(debug_dir, exist_ok=True)
-            timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
-            table_file = os.path.join(debug_dir, f"{timestamp}_nikud_reversal_table.txt")
+            table_file = os.path.join(debug_dir, f"{timestamp}_page{page_num:02d}_nikud_reversal_table.txt")
             
             with open(table_file, 'w', encoding='utf-8') as f:
                 f.write("ТАБЛИЦА СРАВНЕНИЯ СЛОВ С ОГЛАСОВКАМИ ДО И ПОСЛЕ ПЕРЕВОРОТА\n")
@@ -685,7 +757,7 @@ class FinalCorrectedAnalyzer:
                 x1=word['x1'],
                 y1=word.get('bottom', word['top'] + 12),
                 language=self.language_info['language'],
-                font_size_estimate=12.0,
+                font_size_estimate=word.get('font_size', 12.0),
                 is_punctuation=is_punctuation(word['text'])
             )
             processed_words.append(processed_word)
@@ -722,8 +794,8 @@ class FinalCorrectedAnalyzer:
             
             # Увеличиваем порог для знаков препинания - они должны объединяться с соседними словами
             effective_threshold = adaptive_gap_threshold
-            if is_punctuation(next_word.original_text) or is_punctuation(current_word.original_text):
-                effective_threshold = adaptive_gap_threshold * 1.5
+            #if is_punctuation(next_word.original_text) or is_punctuation(current_word.original_text):
+            #    effective_threshold = adaptive_gap_threshold * 1.5
             
             if gap > effective_threshold:
                 lines.append(current_line)
@@ -782,7 +854,7 @@ class FinalCorrectedAnalyzer:
                 x1=word['x1'],
                 y1=word.get('bottom', word['top'] + 12),
                 language=self.language_info['language'],
-                font_size_estimate=12.0,
+                font_size_estimate=word.get('font_size', 12.0),
                 is_punctuation=is_punctuation(word['text'])
             )
             processed_words.append(processed_word)
@@ -808,16 +880,13 @@ class FinalCorrectedAnalyzer:
             current_word = sorted_words[i]
             next_word = sorted_words[i + 1]
             
-            # Вычисляем разрыв
-            if direction == 'rtl':
-                gap = abs(current_word.x0 - next_word.x1)
-            else:
-                gap = next_word.x0 - current_word.x1
+            # Вычисляем разрыв - мин.значение для rtl и ltr
+            gap = min(abs(current_word.x0 - next_word.x1),abs(next_word.x0 - current_word.x1))
             
             # Увеличиваем порог для знаков препинания - они должны объединяться с соседними словами
             effective_threshold = adaptive_gap_threshold
-            if is_punctuation(next_word.original_text) or is_punctuation(current_word.original_text):
-                effective_threshold = adaptive_gap_threshold * 1.5
+            #if is_punctuation(next_word.original_text) or is_punctuation(current_word.original_text):
+            #    effective_threshold = adaptive_gap_threshold * 1.5
             
             if gap > effective_threshold:
                 lines.append(current_line)
@@ -1146,15 +1215,15 @@ class FinalCorrectedAnalyzer:
             f.write("="*80 + "\n\n")
             
             # Заголовок таблицы
-            f.write(f"{'№':<5} {'y1':<10} {'x0':<10} {'x1':<10} {'центр x':<12} {'текст':<30}\n")
+            f.write(f"{'№':<5} {'y0':<10} {'y1':<10} {'x0':<10} {'x1':<10} {'центр x':<12} {'текст':<30}\n")
             f.write("-"*80 + "\n")
-            
+
             # Строки таблицы
             for i, line in enumerate(sorted_lines):
                 center_x = (line.x0 + line.x1) / 2
                 # Обрезаем текст если слишком длинный
                 text_display = str(str(line.text))[:27] + "..." if len(str(line.text)) > 30 else str(line.text)
-                f.write(f"{i+1:<5} {line.y1:<10.1f} {line.x0:<10.1f} {line.x1:<10.1f} {center_x:<12.1f} {text_display:<30}\n")
+                f.write(f"{i+1:<5} {line.y0:<10.1f} {line.y1:<10.1f} {line.x0:<10.1f} {line.x1:<10.1f} {center_x:<12.1f} {text_display:<30}\n")
         
         print(f"     📊 Таблица строк: {table_file}")
     
@@ -1443,13 +1512,31 @@ class FinalCorrectedAnalyzer:
                     # Проверяем порог перекрытия
                     if overlap_percent > 70:
                         # Это кандидат для добавления
-                        # Выбираем ближайшую по y
+                        # Выбираем ближайшую по y, затем по x (для RTL - справа, для LTR - слева)
                         if y_distance < best_y_distance:
                             best_overlap = overlap_percent
                             best_y_distance = y_distance
                             best_match = candidate_line
                             best_match_index = j
-                            debug_log.append(f"  ✓ Кандидат {j+1}: y_distance={y_distance:.1f}pt, overlap={overlap_percent:.1f}% - ЛУЧШИЙ")
+                            debug_log.append(f"  ✓ Кандидат {j+1}: y_distance={y_distance:.1f}pt, overlap={overlap_percent:.1f}% - ЛУЧШИЙ (по y)")
+                        elif y_distance == best_y_distance:
+                            # При равном y_distance приоритет по x для RTL/LTR
+                            if is_rtl:
+                                # RTL: приоритет у строк с большим x0 (справа)
+                                if candidate_line.x0 > best_match.x0:
+                                    best_overlap = overlap_percent
+                                    best_y_distance = y_distance
+                                    best_match = candidate_line
+                                    best_match_index = j
+                                    debug_log.append(f"  ✓ Кандидат {j+1}: y_distance={y_distance:.1f}pt, overlap={overlap_percent:.1f}% - ЛУЧШИЙ (по x RTL)")
+                            else:
+                                # LTR: приоритет у строк с меньшим x0 (слева)
+                                if candidate_line.x0 < best_match.x0:
+                                    best_overlap = overlap_percent
+                                    best_y_distance = y_distance
+                                    best_match = candidate_line
+                                    best_match_index = j
+                                    debug_log.append(f"  ✓ Кандидат {j+1}: y_distance={y_distance:.1f}pt, overlap={overlap_percent:.1f}% - ЛУЧШИЙ (по x LTR)")
                     else:
                         debug_log.append(f"  ✗ Кандидат {j+1}: y_distance={y_distance:.1f}pt, overlap={overlap_percent:.1f}% - ОТКЛОНЕН (низкое перекрытие)")
                 
@@ -1788,13 +1875,13 @@ def main():
 
     if not target_path:
         utils.tbox_log("Целевой файл не определен.", META, "ERROR", CONF)
-        print("Использование: python tbox_extract_pdf.py <pdf_file>")
+        print("Использование: python tbox_extract_pdf_debug.py <pdf_file>")
         sys.exit(1)
 
     utils.tbox_log(f"Обработка файла: {os.path.basename(target_path)}", META, "START", CONF)
 
     # 3. Анализ PDF
-    analyzer = FinalCorrectedAnalyzer(debug_mode=False)
+    analyzer = FinalCorrectedAnalyzer(debug_mode=True)
     success = analyzer.analyze_page_with_final_corrected(target_path)
 
     if success:

@@ -1,0 +1,15 @@
+{
+  "gemini": {
+    "api_key": "YOUR_GEMINI_API_KEY_HERE",
+    "model": "gemini-1.5-flash"
+  },
+  "paths": {
+    "input_dir": "../01_INBOX",
+    "output_dir": "../02_TXT/MD"
+  },
+  "extraction": {
+    "image_resolution": 2,
+    "timeout": 30,
+    "max_retries": 3
+  }
+}
